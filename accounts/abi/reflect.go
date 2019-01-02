@@ -71,11 +71,14 @@ func mustArrayToByteSlice(value reflect.Value) reflect.Value {
 //
 // set is a bit more lenient when it comes to assignment and doesn't force an as
 // strict ruleset as bare `reflect` does.
-func set(dst, src reflect.Value, output Argument) error {
-	dstType := dst.Type()
-	srcType := src.Type()
+func set(dst, src reflect.Value) error {
+	dstType, srcType := dst.Type(), src.Type()
 	switch {
-	case dstType.AssignableTo(srcType):
+	case dstType.Kind() == reflect.Interface:
+		return set(dst.Elem(), src)
+	case dstType.Kind() == reflect.Ptr && dstType.Elem() != derefbigT:
+		return set(dst.Elem(), src)
+	case srcType.AssignableTo(dstType) && dst.CanSet():
 		dst.Set(src)
 	case dstType.Kind() == reflect.Interface:
 		dst.Set(src)

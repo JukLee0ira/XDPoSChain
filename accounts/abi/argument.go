@@ -34,24 +34,27 @@ type Argument struct {
 
 type Arguments []Argument
 
+type ArgumentMarshaling struct {
+	Name       string
+	Type       string
+	Components []ArgumentMarshaling
+	Indexed    bool
+}
+
 // UnmarshalJSON implements json.Unmarshaler interface
 func (argument *Argument) UnmarshalJSON(data []byte) error {
-	var extarg struct {
-		Name    string
-		Type    string
-		Indexed bool
-	}
-	err := json.Unmarshal(data, &extarg)
+	var dec ArgumentMarshaling
+	err := json.Unmarshal(data, &dec)
 	if err != nil {
 		return fmt.Errorf("argument json err: %v", err)
 	}
 
-	argument.Type, err = NewType(extarg.Type)
+	argument.Type, err = NewType(dec.Type, dec.Components)
 	if err != nil {
 		return err
 	}
-	argument.Name = extarg.Name
-	argument.Indexed = extarg.Indexed
+	argument.Name = dec.Name
+	argument.Indexed = dec.Indexed
 
 	return nil
 }
@@ -86,7 +89,6 @@ func (arguments Arguments) isTuple() bool {
 
 // Unpack performs the operation hexdata -> Go format
 func (arguments Arguments) Unpack(v interface{}, data []byte) error {
-
 	// make sure the passed value is arguments pointer
 	if reflect.Ptr != reflect.ValueOf(v).Kind() {
 		return fmt.Errorf("abi: Unpack(non-pointer %T)", v)
@@ -119,7 +121,6 @@ func (arguments Arguments) unpackTuple(v interface{}, marshalledValues []interfa
 		typ   = value.Type()
 		kind  = value.Kind()
 	)
-
 	if err := requireUnpackKind(value, typ, kind, arguments); err != nil {
 		return err
 	}
@@ -130,9 +131,6 @@ func (arguments Arguments) unpackTuple(v interface{}, marshalledValues []interfa
 		}
 	}
 	for i, arg := range arguments.NonIndexed() {
-
-		reflectValue := reflect.ValueOf(marshalledValues[i])
-
 		switch kind {
 		case reflect.Struct:
 			err := unpackStruct(value, reflectValue, arg)
@@ -144,11 +142,10 @@ func (arguments Arguments) unpackTuple(v interface{}, marshalledValues []interfa
 				return fmt.Errorf("abi: insufficient number of arguments for unpack, want %d, got %d", len(arguments), value.Len())
 			}
 			v := value.Index(i)
-			if err := requireAssignable(v, reflectValue); err != nil {
+			if err := requireAssignable(v, reflect.ValueOf(marshalledValues[i])); err != nil {
 				return err
 			}
-
-			if err := set(v.Elem(), reflectValue, arg); err != nil {
+			if err := unpack(&arg.Type, v.Addr().Interface(), marshalledValues[i]); err != nil {
 				return err
 			}
 		default:
@@ -214,7 +211,11 @@ func (arguments Arguments) UnpackValues(data []byte) ([]interface{}, error) {
 			//
 			// Calculate the full array size to get the correct offset for the next argument.
 			// Decrement it by 1, as the normal index increment is still applied.
-			virtualArgs += getArraySize(&arg.Type) - 1
+			virtualArgs += getTypeSize(arg.Type)/32 - 1
+		} else if arg.Type.T == TupleTy && !isDynamicType(arg.Type) {
+			// If we have a static tuple, like (uint256, bool, uint256), these are
+			// coded as just like uint256,bool,uint256
+			virtualArgs += getTypeSize(arg.Type)/32 - 1
 		}
 		if err != nil {
 			return nil, err

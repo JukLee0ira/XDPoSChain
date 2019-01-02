@@ -33,6 +33,7 @@ const (
 	StringTy
 	SliceTy
 	ArrayTy
+	TupleTy
 	AddressTy
 	FixedBytesTy
 	BytesTy
@@ -43,12 +44,12 @@ const (
 
 // Type is the reflection of the supported argument type
 type Type struct {
-	Elem *Type
-
-	Kind reflect.Kind
-	Type reflect.Type
-	Size int
-	T    byte // Our own type checking
+	Elem       *Type
+	TupleElems []*Type
+	Kind       reflect.Kind
+	Type       reflect.Type
+	Size       int
+	T          byte // Our own type checking
 
 	stringKind string // holds the unparsed string for deriving signatures
 }
@@ -59,7 +60,7 @@ var (
 )
 
 // NewType creates a new reflection type of abi type given in t.
-func NewType(t string) (typ Type, err error) {
+func NewType(t string, components []ArgumentMarshaling) (typ Type, err error) {
 	// check that array brackets are equal if they exist
 	if strings.Count(t, "[") != strings.Count(t, "]") {
 		return Type{}, errors.New("invalid arg type in abi")
@@ -72,7 +73,7 @@ func NewType(t string) (typ Type, err error) {
 	if strings.Count(t, "[") != 0 {
 		i := strings.LastIndex(t, "[")
 		// recursively embed the type
-		embeddedType, err := NewType(t[:i])
+		embeddedType, err := NewType(t[:i], components)
 		if err != nil {
 			return Type{}, err
 		}
@@ -158,6 +159,29 @@ func NewType(t string) (typ Type, err error) {
 			typ.Size = varSize
 			typ.Type = reflect.ArrayOf(varSize, reflect.TypeOf(byte(0)))
 		}
+	case "tuple":
+		var (
+			fields []reflect.StructField
+			elems  []*Type
+		)
+		for _, c := range components {
+			cType, err := NewType(c.Type, c.Components)
+			if err != nil {
+				return Type{}, err
+			}
+			if ToCamelCase(c.Name) == "" {
+				return Type{}, errors.New("abi: purely anonymous or underscored field is not supported")
+			}
+			fields = append(fields, reflect.StructField{
+				Name: ToCamelCase(c.Name),
+				Type: cType.Type,
+			})
+			elems = append(elems, &cType)
+		}
+		typ.Kind = reflect.Struct
+		typ.Type = reflect.StructOf(fields)
+		typ.TupleElems = elems
+		typ.T = TupleTy
 	case "function":
 		typ.Kind = reflect.Array
 		typ.T = FunctionTy
@@ -178,7 +202,6 @@ func (t Type) String() (out string) {
 func (t Type) pack(v reflect.Value) ([]byte, error) {
 	// dereference pointer first if it's a pointer
 	v = indirect(v)
-
 	if err := typeCheck(t, v); err != nil {
 		return nil, err
 	}
