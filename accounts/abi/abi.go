@@ -95,19 +95,20 @@ func (abi ABI) getArguments(name string, data []byte) (Arguments, error) {
 }
 
 // Unpack output in v according to the abi specification
-func (abi ABI) Unpack(v interface{}, name string, output []byte) (err error) {
-	if len(output) == 0 {
-		return errors.New("abi: unmarshalling empty output")
+func (abi ABI) Unpack(v interface{}, name string, data []byte) (err error) {
+	if len(data) == 0 {
+		return fmt.Errorf("abi: unmarshalling empty output")
 	}
 	// since there can't be naming collisions with contracts and events,
 	// we need to decide whether we're calling a method or an event
 	if method, ok := abi.Methods[name]; ok {
-		if len(output)%32 != 0 {
-			return fmt.Errorf("abi: improperly formatted output: %s - Bytes: [%+v]", string(output), output)
+		if len(data)%32 != 0 {
+			return fmt.Errorf("abi: improperly formatted output: %s - Bytes: [%+v]", string(data), data)
 		}
-		return method.Outputs.Unpack(v, output)
-	} else if event, ok := abi.Events[name]; ok {
-		return event.Inputs.Unpack(v, output)
+		return method.Outputs.Unpack(v, data)
+	}
+	if event, ok := abi.Events[name]; ok {
+		return event.Inputs.Unpack(v, data)
 	}
 	return errors.New("abi: could not locate named method or event")
 }
