@@ -17,7 +17,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -25,12 +24,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/core/vm"
-	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
-)
-
-var (
-	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
 )
 
 /*
@@ -67,7 +61,6 @@ type StateTransition struct {
 // Message represents a message sent to a contract.
 type Message interface {
 	From() common.Address
-	//FromFrontier() (common.Address, error)
 	To() *common.Address
 
 	GasPrice() *big.Int
@@ -80,6 +73,24 @@ type Message interface {
 	BalanceTokenFee() *big.Int
 	AccessList() types.AccessList
 }
+
+// ExecutionResult includes all output after executing given evm message
+// no matter the execution itself is successful or not.
+type ExecutionResult struct {
+	UsedGas      uint64 // Total used gas but include the refunded gas
+	Err          error  // Any error encountered during the exection(listed in core/vm/errors.go)
+	Result       []byte // Returned value of the calling function
+	RevertReason []byte // Reason to perform revert thrown by solidity code
+}
+
+// Unwrap returns the internal evm error which allows us for further
+// analysis outside.
+func (result *ExecutionResult) Unwrap() error {
+	return result.Err
+}
+
+// Failed returns the indicator whether the execution is successful or not
+func (result *ExecutionResult) Failed() bool { return result.Err != nil }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
 func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, isHomestead bool) (uint64, error) {
@@ -138,7 +149,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, owner common.Address) ([]byte, uint64, bool, error, error) {
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, owner common.Address) (*ExecutionResult, error, error) {
 	return NewStateTransition(evm, msg, gp).TransitionDb(owner)
 }
 
@@ -179,10 +190,10 @@ func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
 	if balanceTokenFee == nil {
 		if state.GetBalance(from.Address()).Cmp(mgval) < 0 {
-			return errInsufficientBalanceForGas
+			return ErrInsufficientBalanceForFee
 		}
 	} else if balanceTokenFee.Cmp(mgval) < 0 {
-		return errInsufficientBalanceForGas
+		return ErrInsufficientBalanceForFee
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
 		return err
@@ -216,11 +227,34 @@ func (st *StateTransition) preCheck() error {
 }
 
 // TransitionDb will transition the state by applying the current message and
-// returning the result including the the used gas. It returns an error if it
-// failed. An error indicates a consensus issue.
-func (st *StateTransition) TransitionDb(owner common.Address) (ret []byte, usedGas uint64, failed bool, err error, vmErr error) {
-	if err = st.preCheck(); err != nil {
-		return
+// returning the evm execution result with following fields.
+//
+//   - used gas:
+//     total gas used (including gas being refunded)
+//   - execution result:
+//     the return value of the calling function
+//   - revert reason:
+//     reason to perform revert thrown by solidity code
+//   - concrete execution error:
+//     various **EVM** error which aborts the execution,
+//     e.g. ErrOutOfGas, ErrExecutionReverted
+//
+// However if any consensus issue encountered, return the error directly with
+// nil evm execution result.
+func (st *StateTransition) TransitionDb(owner common.Address) (res *ExecutionResult, err error, vmErr error) {
+	// First check this message satisfies all consensus rules before
+	// applying the message. The rules include these clauses
+	//
+	// 1. the nonce of the message caller is correct
+	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+	// 3. the amount of gas required is available in the block
+	// 4. the purchased gas is enough to cover intrinsic usage
+	// 5. there is no overflow when calculating intrinsic gas
+	// 6. caller has enough balance to cover asset transfer for **topmost** call
+
+	// Check clauses 1-3, buy gas if everything is correct
+	if err := st.preCheck(); err != nil {
+		return nil, err, nil
 	}
 	msg := st.msg
 	sender := st.from() // err checked in preCheck
@@ -228,49 +262,35 @@ func (st *StateTransition) TransitionDb(owner common.Address) (ret []byte, usedG
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.BlockNumber)
 	contractCreation := msg.To() == nil
 
-	// Pay intrinsic gas
+	// Check clauses 4-5, subtract intrinsic if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead)
 	if err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 	if st.gas < gas {
-		return nil, 0, false, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas), nil
+		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas), nil
 	}
 	st.gas -= gas
+
+	// Check clauses 6
+	if msg.Value().Sign() > 0 && !st.evm.CanTransfer(st.state, msg.From(), msg.Value()) {
+		return nil, ErrInsufficientBalanceForTransfer, nil
+	}
 
 	if rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber); rules.IsEIP1559 {
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 	}
 
 	var (
-		evm = st.evm
-		// vm errors do not effect consensus and are therefor
-		// not assigned to err, except for insufficient balance
-		// error.
-		vmerr error
+		ret   []byte
+		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
-	// for debugging purpose
-	// TODO: clean it after fixing the issue https://github.com/XinFinOrg/XDPoSChain/issues/401
-	var contractAction string
-	nonce := uint64(1)
 	if contractCreation {
-		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
-		contractAction = "contract creation"
+		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
-		nonce = st.state.GetNonce(sender.Address()) + 1
-		st.state.SetNonce(sender.Address(), nonce)
-		ret, st.gas, vmerr = evm.Call(sender, st.to().Address(), st.data, st.gas, st.value)
-		contractAction = "contract call"
-	}
-	if vmerr != nil {
-		log.Debug("VM returned with error", "action", contractAction, "contract address", st.to().Address(), "gas", st.gas, "gasPrice", st.gasPrice, "nonce", nonce, "err", vmerr)
-		// The only possible consensus-error would be if there wasn't
-		// sufficient balance to make the transfer happen. The first
-		// balance transfer may never fail.
-		if vmerr == vm.ErrInsufficientBalance {
-			return nil, 0, false, vmerr, nil
-		}
+		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		ret, st.gas, vmerr = st.evm.Call(sender, st.to().Address(), st.data, st.gas, st.value)
 	}
 	st.refundGas()
 
@@ -282,7 +302,18 @@ func (st *StateTransition) TransitionDb(owner common.Address) (ret []byte, usedG
 		st.state.AddBalance(st.evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 	}
 
-	return ret, st.gasUsed(), vmerr != nil, nil, vmerr
+	var revert, result []byte
+	if vmerr == vm.ErrExecutionReverted {
+		revert = ret // Revert reason will be returned in ret iif the vmerr is ErrExecutionReverted
+	} else {
+		result = ret // Otherwise the ret represents the execution result, may nil
+	}
+	return &ExecutionResult{
+		UsedGas:      st.gasUsed(),
+		Err:          vmerr,
+		Result:       result,
+		RevertReason: revert,
+	}, nil, vmerr
 }
 
 func (st *StateTransition) refundGas() {

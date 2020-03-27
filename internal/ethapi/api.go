@@ -1241,18 +1241,87 @@ func (s *PublicBlockChainAPI) getCandidatesFromSmartContract() ([]utils.Masterno
 	return candidatesWithStakeInfo, nil
 }
 
-func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, vmCfg vm.Config, timeout time.Duration, globalGasCap uint64) ([]byte, uint64, bool, error, error) {
+// CallArgs represents the arguments for a call.
+type CallArgs struct {
+	From       *common.Address   `json:"from"`
+	To         *common.Address   `json:"to"`
+	Gas        *hexutil.Uint64   `json:"gas"`
+	GasPrice   *hexutil.Big      `json:"gasPrice"`
+	Value      *hexutil.Big      `json:"value"`
+	Data       *hexutil.Bytes    `json:"data"`
+	AccessList *types.AccessList `json:"accessList"`
+}
+
+// ToMessage converts CallArgs to the Message type used by the core evm
+// TODO: set balanceTokenFee
+func (args *CallArgs) ToMessage(b Backend, number *big.Int, globalGasCap uint64) types.Message {
+	// Set sender address or use a default if none specified
+	var addr common.Address
+	if args.From == nil || *args.From == (common.Address{}) {
+		if wallets := b.AccountManager().Wallets(); len(wallets) > 0 {
+			if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+				addr = accounts[0].Address
+			}
+		}
+	} else {
+		addr = *args.From
+	}
+
+	// Set default gas & gas price if none were set
+	gas := globalGasCap
+	if gas == 0 {
+		gas = uint64(math.MaxUint64 / 2)
+	}
+	if args.Gas != nil {
+		gas = uint64(*args.Gas)
+	}
+	if globalGasCap != 0 && globalGasCap < gas {
+		log.Warn("Caller gas above allowance, capping", "requested", gas, "cap", globalGasCap)
+		gas = globalGasCap
+	}
+	gasPrice := new(big.Int)
+	if args.GasPrice != nil {
+		gasPrice = args.GasPrice.ToInt()
+	}
+	if gasPrice.Sign() <= 0 {
+		gasPrice = new(big.Int).SetUint64(defaultGasPrice)
+	}
+
+	value := new(big.Int)
+	if args.Value != nil {
+		value = args.Value.ToInt()
+	}
+
+	var data []byte
+	if args.Data != nil {
+		data = *args.Data
+	}
+
+	var accessList types.AccessList
+	if args.AccessList != nil {
+		accessList = *args.AccessList
+	}
+
+	balanceTokenFee := big.NewInt(0).SetUint64(gas)
+	balanceTokenFee = balanceTokenFee.Mul(balanceTokenFee, gasPrice)
+
+	// Create new call message
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, accessList, false, balanceTokenFee, number)
+	return msg
+}
+
+func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, vmCfg vm.Config, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error, error) {
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
 	statedb, header, err := b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if statedb == nil || err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 	if header == nil {
-		return nil, 0, false, errors.New("nil header in DoCall"), nil
+		return nil, errors.New("nil header in DoCall"), nil
 	}
 	if err := overrides.Apply(statedb); err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 
 	msg := args.ToMessage(b, header.Number, globalGasCap)
@@ -1272,24 +1341,24 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 
 	block, err := b.BlockByNumberOrHash(ctx, blockNrOrHash)
 	if err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 	if block == nil {
-		return nil, 0, false, fmt.Errorf("nil block in DoCall: number=%d, hash=%s", header.Number.Uint64(), header.Hash().Hex()), nil
+		return nil, fmt.Errorf("nil block in DoCall: number=%d, hash=%s", header.Number.Uint64(), header.Hash().Hex()), nil
 	}
 	author, err := b.GetEngine().Author(block.Header())
 	if err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 	XDCxState, err := b.XDCxService().GetTradingState(block, author)
 	if err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 
 	// Get a new instance of the EVM.
 	evm, vmError, err := b.GetEVM(ctx, msg, statedb, XDCxState, header, &vmCfg)
 	if err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 	// Wait for the context to be done and cancel the evm. Even if the
 	// EVM has finished, cancelling may be done (repeatedly)
@@ -1301,19 +1370,19 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	// Execute the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 	owner := common.Address{}
-	res, gas, failed, err, vmErr := core.ApplyMessage(evm, msg, gp, owner)
+	result, err, vmErr := core.ApplyMessage(evm, msg, gp, owner)
 	if err := vmError(); err != nil {
-		return nil, 0, false, err, nil
+		return nil, err, nil
 	}
 
 	// If the timer caused an abort, return an appropriate error message
 	if evm.Cancelled() {
-		return nil, 0, false, fmt.Errorf("execution aborted (timeout = %v)", timeout), nil
+		return nil, fmt.Errorf("execution aborted (timeout = %v)", timeout), nil
 	}
 	if err != nil {
-		return res, 0, false, fmt.Errorf("err: %w (supplied gas %d)", err, msg.Gas()), nil
+		return result, fmt.Errorf("err: %w (supplied gas %d)", err, msg.Gas()), nil
 	}
-	return res, gas, failed, err, vmErr
+	return result, err, vmErr
 }
 
 func newRevertError(res []byte) *revertError {
@@ -1357,124 +1426,92 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 	if args.To != nil && *args.To == common.MasternodeVotingSMCBinary {
 		timeout = 0
 	}
-	result, _, failed, err, vmErr := DoCall(ctx, s.b, args, *blockNrOrHash, overrides, vm.Config{}, timeout, s.b.RPCGasCap())
+	result, err, vmErr := DoCall(ctx, s.b, args, *blockNrOrHash, overrides, vm.Config{}, timeout, s.b.RPCGasCap())
+
 	if err != nil {
 		return nil, err
 	}
 	// If the result contains a revert reason, try to unpack and return it.
-	if failed && len(result) > 0 {
-		return nil, newRevertError(result)
+	if result.Failed() && len(result.Result) > 0 {
+		return nil, newRevertError(result.Result)
 	}
 
-	return (hexutil.Bytes)(result), vmErr
+	return result.Result, vmErr
 }
 
-func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, gasCap uint64) (hexutil.Uint64, error) {
-	// Retrieve the base state and mutate it with any overrides
-	state, _, err := b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
-	if state == nil || err != nil {
-		return 0, err
-	}
-	if err = overrides.Apply(state); err != nil {
-		return 0, err
-	}
+func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, gasCap uint64) (hexutil.Uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
 		hi  uint64
 		cap uint64
 	)
-	// Use zero address if sender unspecified.
-	if args.From == nil {
-		args.From = new(common.Address)
-	}
-	// Determine the highest gas limit can be used during the estimation.
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		hi = uint64(*args.Gas)
 	} else {
-		// Retrieve the current pending block to act as the gas ceiling
+		// Retrieve the block to act as the gas ceiling
 		block, err := b.BlockByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return 0, err
 		}
-		if block == nil {
-			return 0, errors.New("block not found")
-		}
 		hi = block.GasLimit()
 	}
-	// Recap the highest gas allowance with specified gascap.
 	if gasCap != 0 && hi > gasCap {
 		log.Warn("Caller gas above allowance, capping", "requested", hi, "cap", gasCap)
 		hi = gasCap
 	}
 	cap = hi
 
+	// Use zero address if sender unspecified.
+	if args.From == nil {
+		args.From = new(common.Address)
+	}
 	// Create a helper to check if a gas allowance results in an executable transaction
-	executable := func(gas uint64) (bool, []byte, error, error) {
+	executable := func(gas uint64) (bool, []byte, *core.ExecutionResult, error, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		res, _, failed, err, vmErr := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
+		result, err, vmErr := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
 		if err != nil {
-			if errors.Is(err, vm.ErrOutOfGas) || errors.Is(err, core.ErrIntrinsicGas) {
-				return false, nil, nil, nil // Special case, raise gas limit
+			if err == core.ErrInsufficientIntrinsicGas {
+				return true, nil, nil, nil, nil // Special case, raise gas limit
 			}
-			return false, nil, err, nil // Bail out
+			return true, nil, nil, err, nil // Bail out
 		}
-		if failed {
-			return false, res, nil, vmErr
-		}
-
-		return true, nil, nil, nil
+		return result.Failed(), result.Result, result, nil, vmErr
 	}
-
-	// If the transaction is a plain value transfer, short circuit estimation and
-	// directly try 21000. Returning 21000 without any execution is dangerous as
-	// some tx field combos might bump the price up even for plain transfers (e.g.
-	// unused access list items). Ever so slightly wasteful, but safer overall.
-	if args.Data == nil || len(*args.Data) == 0 {
-		if args.To != nil && state.GetCodeSize(*args.To) == 0 {
-			ok, _, err, _ := executable(params.TxGas)
-			if ok && err == nil {
-				return hexutil.Uint64(params.TxGas), nil
-			}
-		}
-	}
-
 	// Execute the binary search and hone in on an executable gas limit
 	for lo+1 < hi {
 		mid := (hi + lo) / 2
-		ok, _, err, _ := executable(mid)
+		failed, _, _, _, err := executable(mid)
 
 		// If the error is not nil(consensus error), it means the provided message
-		// call or transaction will never be accepted no matter how much gas it is
-		// assigned. Return the error directly, don't struggle any more.
+		// call or transaction will never be accpeted no matter how many gas assigened.
+		// Return the error directly, don't struggle any more
 		if err != nil {
 			return 0, err
 		}
-
-		if !ok {
+		if failed {
 			lo = mid
 		} else {
 			hi = mid
 		}
 	}
-
 	// Reject the transaction as invalid if it still fails at the highest allowance
 	if hi == cap {
-		ok, res, err, vmErr := executable(hi)
+		failed, res, result, err, vmErr := executable(hi)
 		if err != nil {
 			return 0, err
 		}
-
-		if !ok {
+		if failed {
 			if vmErr != vm.ErrOutOfGas {
 				if len(res) > 0 {
 					return 0, newRevertError(res)
 				}
 				return 0, vmErr
 			}
-
-			// Otherwise, the specified gas cap is too low
+			if result != nil && len(result.RevertReason) != 0 {
+				return 0, fmt.Errorf("Reverted %x", result.RevertReason)
+			}
 			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
 		}
 	}
@@ -1960,16 +1997,17 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		tracer := vm.NewAccessListTracer(accessList, args.from(), to, precompiles)
 		config := vm.Config{Tracer: tracer, Debug: true}
 		vmenv, _, err := b.GetEVM(ctx, msg, statedb, XDCxState, header, &config)
+
 		if err != nil {
 			return nil, 0, nil, err
 		}
 		// TODO: determine the value of owner
-		_, UsedGas, _, err, vmErr := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), owner)
+		res, err, vmErr := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), owner)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}
 		if tracer.Equal(prevTracer) {
-			return accessList, UsedGas, vmErr, nil
+			return accessList, res.UsedGas, vmErr, nil
 		}
 		prevTracer = tracer
 	}
