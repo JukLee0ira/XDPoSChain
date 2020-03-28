@@ -80,7 +80,7 @@ func TestSimulatedBackend_EstimateGas(t *testing.T) {
 			GasPrice: big.NewInt(0),
 			Value:    big.NewInt(1),
 			Data:     nil,
-		}, 0, errors.New("transaction reverted (0x)")},
+		}, 0, errors.New("always failing transaction (execution reverted)")},
 
 		{"Revert", XDPoSChain.CallMsg{
 			From:     addr,
@@ -89,7 +89,7 @@ func TestSimulatedBackend_EstimateGas(t *testing.T) {
 			GasPrice: big.NewInt(0),
 			Value:    nil,
 			Data:     common.Hex2Bytes("d8b98391"),
-		}, 0, errors.New("transaction reverted (0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000d72657665727420726561736f6e00000000000000000000000000000000000000)")},
+		}, 0, errors.New("always failing transaction (execution reverted) (0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000d72657665727420726561736f6e00000000000000000000000000000000000000)")},
 
 		{"PureRevert", XDPoSChain.CallMsg{
 			From:     addr,
@@ -98,7 +98,7 @@ func TestSimulatedBackend_EstimateGas(t *testing.T) {
 			GasPrice: big.NewInt(0),
 			Value:    nil,
 			Data:     common.Hex2Bytes("aa8b1d30"),
-		}, 0, errors.New("transaction reverted (0x)")},
+		}, 0, errors.New("always failing transaction (execution reverted)")},
 
 		{"OOG", XDPoSChain.CallMsg{
 			From:     addr,
