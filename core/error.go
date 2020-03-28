@@ -33,8 +33,8 @@ var (
 	ErrNoGenesis = errors.New("genesis not found in chain")
 )
 
-// State transition consensus errors, any of them
-// encountered can lead to consensus issue.
+// State transition consensus errors, any of them encountered during
+// the block processing can lead to consensus issue.
 var (
 	// ErrNonceTooLow is returned if the nonce of a transaction is lower than the
 	// one present in the local chain.
@@ -80,11 +80,3 @@ var (
 	// ErrGasUintOverflow is returned when calculating gas usage.
 	ErrGasUintOverflow = errors.New("gas uint64 overflow")
 )
-
-type ConsensusError struct {
-	Reason error
-}
-
-func (ce *ConsensusError) Unwarp() error {
-	return ce.Reason
-}

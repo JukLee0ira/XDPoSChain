@@ -262,7 +262,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (res *ExecutionRes
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.BlockNumber)
 	contractCreation := msg.To() == nil
 
-	// Check clauses 4-5, subtract intrinsic if everything is correct
+	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead)
 	if err != nil {
 		return nil, err, nil
@@ -272,7 +272,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (res *ExecutionRes
 	}
 	st.gas -= gas
 
-	// Check clauses 6
+	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.CanTransfer(st.state, msg.From(), msg.Value()) {
 		return nil, ErrInsufficientBalanceForTransfer, nil
 	}
