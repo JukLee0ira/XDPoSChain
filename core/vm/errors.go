@@ -69,4 +69,4 @@ type ErrInvalidOpCode struct {
 	opcode OpCode
 }
 
-func (e *ErrInvalidOpCode) Error() string { return fmt.Sprintf("invalid opcode: %s", e.opcode) }
+func (e *ErrInvalidOpCode) Error() string { return fmt.Sprintf("invalid opcode: %s", byte(e.opcode)) }

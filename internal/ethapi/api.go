@@ -1432,11 +1432,11 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args TransactionArgs, bl
 		return nil, err
 	}
 	// If the result contains a revert reason, try to unpack and return it.
-	if result.Failed() && len(result.Result) > 0 {
-		return nil, newRevertError(result.Result)
+	if result.Failed() && len(result.Return()) > 0 {
+		return nil, newRevertError(result.Return())
 	}
 
-	return result.Result, vmErr
+	return result.Return(), vmErr
 }
 
 func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, gasCap uint64) (hexutil.Uint64, error) {
@@ -1472,12 +1472,12 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 
 		result, err, vmErr := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
 		if err != nil {
-			if err == core.ErrInsufficientIntrinsicGas {
+			if err == core.ErrIntrinsicGas {
 				return true, nil, nil, nil, nil // Special case, raise gas limit
 			}
 			return true, nil, nil, err, nil // Bail out
 		}
-		return result.Failed(), result.Result, result, nil, vmErr
+		return result.Failed(), result.Return(), result, nil, vmErr
 	}
 	// Execute the binary search and hone in on an executable gas limit
 	for lo+1 < hi {
@@ -1485,8 +1485,8 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		failed, _, _, _, err := executable(mid)
 
 		// If the error is not nil(consensus error), it means the provided message
-		// call or transaction will never be accpeted no matter how many gas assigened.
-		// Return the error directly, don't struggle any more
+		// call or transaction will never be accepted no matter how much gas it is
+		// assigened. Return the error directly, don't struggle any more.
 		if err != nil {
 			return 0, err
 		}
@@ -1512,8 +1512,8 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 			if result != nil {
 				if result.Err != vm.ErrOutOfGas {
 					errMsg := fmt.Sprintf("always failing transaction (%v)", result.Err)
-					if len(result.RevertReason) > 0 {
-						errMsg += fmt.Sprintf(" (0x%x)", result.RevertReason)
+					if len(result.Revert()) > 0 {
+						errMsg += fmt.Sprintf(" (0x%x)", result.Revert())
 					}
 					return 0, errors.New(errMsg)
 				}

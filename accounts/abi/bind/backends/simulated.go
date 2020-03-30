@@ -285,7 +285,7 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call XDPoSChain.Cal
 	if err != nil {
 		return nil, err
 	}
-	return res.Result, nil
+	return res.Return(), nil
 }
 
 // PendingCallContract executes a contract call on the pending state.
@@ -298,7 +298,7 @@ func (b *SimulatedBackend) PendingCallContract(ctx context.Context, call XDPoSCh
 	if err != nil {
 		return nil, err
 	}
-	return res.Result, nil
+	return res.Return(), nil
 }
 
 // PendingNonceAt implements PendingStateReader.PendingNonceAt, retrieving
@@ -344,7 +344,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call XDPoSChain.Call
 		b.pendingState.RevertToSnapshot(snapshot)
 
 		if err != nil {
-			if err == core.ErrInsufficientIntrinsicGas {
+			if err == core.ErrIntrinsicGas {
 				return true, nil, nil // Special case, raise gas limit
 			}
 			return true, nil, err // Bail out
@@ -357,8 +357,8 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call XDPoSChain.Call
 		failed, _, err := executable(mid)
 
 		// If the error is not nil(consensus error), it means the provided message
-		// call or transaction will never be accpeted no matter how many gas assigened.
-		// Return the error directly, don't struggle any more
+		// call or transaction will never be accepted no matter how much gas it is
+		// assigned. Return the error directly, don't struggle any more
 		if err != nil {
 			return 0, err
 		}
@@ -378,8 +378,8 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call XDPoSChain.Call
 			if result != nil {
 				if result.Err != vm.ErrOutOfGas {
 					errMsg := fmt.Sprintf("always failing transaction (%v)", result.Err)
-					if len(result.RevertReason) > 0 {
-						errMsg += fmt.Sprintf(" (0x%x)", result.RevertReason)
+					if len(result.Revert()) > 0 {
+						errMsg += fmt.Sprintf(" (0x%x)", result.Revert())
 					}
 					return 0, errors.New(errMsg)
 				}

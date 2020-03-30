@@ -118,7 +118,7 @@ func CallContractWithState(call ethereum.CallMsg, chain consensus.ChainContext, 
 	if err != nil {
 		return nil, err
 	}
-	return result.Result, err
+	return result.Return(), err
 }
 
 // make sure that balance of token is at slot 0
