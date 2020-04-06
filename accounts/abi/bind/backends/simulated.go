@@ -29,6 +29,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/XDCx"
 	"github.com/XinFinOrg/XDPoSChain/XDCxlending"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
+	"github.com/XinFinOrg/XDPoSChain/accounts/abi"
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi/bind"
 	"github.com/XinFinOrg/XDPoSChain/accounts/keystore"
 	"github.com/XinFinOrg/XDPoSChain/common"
@@ -378,7 +379,12 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call XDPoSChain.Call
 			if result != nil && result.Err != vm.ErrOutOfGas {
 				errMsg := fmt.Sprintf("always failing transaction (%v)", result.Err)
 				if len(result.Revert()) > 0 {
-					errMsg += fmt.Sprintf(" (0x%x)", result.Revert())
+					ret, err := abi.UnpackRevert(result.Revert())
+					if err != nil {
+						errMsg += fmt.Sprintf(" (0x%x)", result.Revert())
+					} else {
+						errMsg += fmt.Sprintf(" (%s)", ret)
+					}
 				}
 				return 0, errors.New(errMsg)
 			}
