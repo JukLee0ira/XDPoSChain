@@ -1532,7 +1532,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 					if len(result.Revert()) > 0 {
 						ret, err := abi.UnpackRevert(result.Revert())
 						if err != nil {
-							revert = "0x" + common.Bytes2Hex(result.Revert())
+							revert = hexutil.Encode(result.Revert())
 						} else {
 							revert = ret
 						}

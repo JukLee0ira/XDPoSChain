@@ -381,7 +381,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call XDPoSChain.Call
 				if len(result.Revert()) > 0 {
 					ret, err := abi.UnpackRevert(result.Revert())
 					if err != nil {
-						errMsg += fmt.Sprintf(" (0x%x)", result.Revert())
+						errMsg += fmt.Sprintf(" (%#x)", result.Revert())
 					} else {
 						errMsg += fmt.Sprintf(" (%s)", ret)
 					}
