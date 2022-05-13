@@ -91,11 +91,7 @@ func (c *collector) addGaugeFloat64(name string, m metrics.GaugeFloat64Snapshot)
 	c.writeGaugeCounter(name, m.Value())
 }
 
-func (c *collector) addGaugeInfo(name string, m metrics.GaugeInfoSnapshot) {
-	c.writeGaugeInfo(name, m.Value())
-}
-
-func (c *collector) addHistogram(name string, m metrics.HistogramSnapshot) {
+func (c *collector) addHistogram(name string, m metrics.Histogram) {
 	pv := []float64{0.5, 0.75, 0.95, 0.99, 0.999, 0.9999}
 	ps := m.Percentiles(pv)
 	c.writeSummaryCounter(name, m.Count())
@@ -133,6 +129,19 @@ func (c *collector) addResettingTimer(name string, m *metrics.ResettingTimerSnap
 		c.writeSummaryPercentile(name, strconv.FormatFloat(pv[i], 'f', -1, 64), ps[i])
 	}
 	c.buff.WriteRune('\n')
+}
+
+func (c *collector) writeGaugeInfo(name string, value metrics.GaugeInfoValue) {
+	name = mutateKey(name)
+	c.buff.WriteString(fmt.Sprintf(typeGaugeTpl, name))
+	c.buff.WriteString(fmt.Sprintf("%s {", name))
+	for idx, entry := range value {
+		c.buff.WriteString(fmt.Sprintf("%s=\"%s\"", entry.Key, entry.Val))
+		if idx != len(value)-1 {
+			c.buff.WriteString(", ")
+		}
+	}
+	c.buff.WriteString("} 1 \n\n")
 }
 
 func (c *collector) writeGaugeInfo(name string, value metrics.GaugeInfoValue) {

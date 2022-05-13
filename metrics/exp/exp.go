@@ -109,7 +109,7 @@ func (exp *exp) getInfo(name string) *expvar.String {
 	return v
 }
 
-func (exp *exp) publishCounter(name string, metric metrics.CounterSnapshot) {
+func (exp *exp) publishCounter(name string, metric metrics.Counter) {
 	v := exp.getInt(name)
 	v.Set(metric.Count())
 }
@@ -127,8 +127,8 @@ func (exp *exp) publishGaugeFloat64(name string, metric metrics.GaugeFloat64Snap
 	exp.getFloat(name).Set(metric.Value())
 }
 
-func (exp *exp) publishGaugeInfo(name string, metric metrics.GaugeInfoSnapshot) {
-	exp.getInfo(name).Set(metric.Value().String())
+func (exp *exp) publishGaugeInfo(name string, metric metrics.GaugeInfo) {
+	exp.getInfo(name).Set(fmt.Sprintf("%s", metric.Value()))
 }
 
 func (exp *exp) publishHistogram(name string, metric metrics.Histogram) {
@@ -188,16 +188,16 @@ func (exp *exp) publishResettingTimer(name string, metric *metrics.ResettingTime
 func (exp *exp) syncToExpvar() {
 	exp.registry.Each(func(name string, i interface{}) {
 		switch i := i.(type) {
-		case *metrics.Counter:
-			exp.publishCounter(name, i.Snapshot())
-		case *metrics.CounterFloat64:
-			exp.publishCounterFloat64(name, i.Snapshot())
-		case *metrics.Gauge:
-			exp.publishGauge(name, i.Snapshot())
-		case *metrics.GaugeFloat64:
-			exp.publishGaugeFloat64(name, i.Snapshot())
-		case *metrics.GaugeInfo:
-			exp.publishGaugeInfo(name, i.Snapshot())
+		case metrics.Counter:
+			exp.publishCounter(name, i)
+		case metrics.CounterFloat64:
+			exp.publishCounterFloat64(name, i)
+		case metrics.Gauge:
+			exp.publishGauge(name, i)
+		case metrics.GaugeFloat64:
+			exp.publishGaugeFloat64(name, i)
+		case metrics.GaugeInfo:
+			exp.publishGaugeInfo(name, i)
 		case metrics.Histogram:
 			exp.publishHistogram(name, i)
 		case *metrics.Meter:

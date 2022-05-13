@@ -24,7 +24,9 @@ import (
 	"math/big"
 	"os"
 	"reflect"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -34,6 +36,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/accounts/usbwallet"
 	"github.com/XinFinOrg/XDPoSChain/cmd/utils"
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/eth"
 	"github.com/XinFinOrg/XDPoSChain/eth/ethconfig"
 	"github.com/XinFinOrg/XDPoSChain/internal/ethapi"
 	"github.com/XinFinOrg/XDPoSChain/internal/flags"
@@ -41,8 +44,9 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/metrics"
 	"github.com/XinFinOrg/XDPoSChain/node"
 	"github.com/XinFinOrg/XDPoSChain/params"
-	"github.com/naoina/toml"
 	"github.com/urfave/cli/v2"
+
+	"github.com/naoina/toml"
 )
 
 var (
@@ -213,6 +217,24 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, XDCConfig) {
 	utils.SetXDCXConfig(ctx, &cfg.XDCX, cfg.Node.DataDir)
 
 	applyMetricConfig(ctx, &cfg)
+
+	// Create Info Gauge with geth system and build information
+	gethInfoGauge := metrics.NewRegisteredGaugeInfo("geth/info", nil)
+	protocolVersions := ""
+	for idx, val := range eth.ProtocolVersions {
+		protocolVersions += strconv.FormatUint(uint64(val), 10)
+		if idx < len(eth.ProtocolVersions)-1 {
+			protocolVersions += ","
+		}
+	}
+	gethInfo := metrics.GaugeInfoValue{
+		metrics.NewGaugeInfoEntry("version", params.VersionWithMeta),
+		metrics.NewGaugeInfoEntry("arch", runtime.GOARCH),
+		metrics.NewGaugeInfoEntry("os", runtime.GOOS),
+		metrics.NewGaugeInfoEntry("commit", gitCommit),
+		metrics.NewGaugeInfoEntry("protocol_versions", protocolVersions),
+	}
+	gethInfoGauge.Update(gethInfo)
 
 	return stack, cfg
 }
