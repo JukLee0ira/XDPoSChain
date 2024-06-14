@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
+//go:build !nacl && !js && !nocgo
 // +build !nacl,!js,!nocgo
 
 package crypto
@@ -21,6 +22,7 @@ package crypto
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"errors"
 	"fmt"
 
 	"github.com/XinFinOrg/XDPoSChain/common/math"
@@ -71,7 +73,7 @@ func VerifySignature(pubkey, hash, signature []byte) bool {
 func DecompressPubkey(pubkey []byte) (*ecdsa.PublicKey, error) {
 	x, y := secp256k1.DecompressPubkey(pubkey)
 	if x == nil {
-		return nil, fmt.Errorf("invalid public key")
+		return nil, errors.New("invalid public key")
 	}
 	return &ecdsa.PublicKey{X: x, Y: y, Curve: S256()}, nil
 }
