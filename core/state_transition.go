@@ -17,7 +17,6 @@
 package core
 
 import (
-	"fmt"
 	"math"
 	"math/big"
 
@@ -268,7 +267,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (res *ExecutionRes
 		return nil, err, nil
 	}
 	if st.gas < gas {
-		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas), nil
+		return nil, ErrInsufficientIntrinsicGas, nil
 	}
 	st.gas -= gas
 
