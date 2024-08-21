@@ -240,7 +240,7 @@ func (st *StateTransition) preCheck() error {
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
-func (st *StateTransition) TransitionDb(owner common.Address) (res *ExecutionResult, err error, vmErr error) {
+func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult, error, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -275,7 +275,6 @@ func (st *StateTransition) TransitionDb(owner common.Address) (res *ExecutionRes
 	if msg.Value().Sign() > 0 && !st.evm.CanTransfer(st.state, msg.From(), msg.Value()) {
 		return nil, ErrInsufficientBalanceForTransfer, nil
 	}
-
 	if rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber); rules.IsEIP1559 {
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 	}
