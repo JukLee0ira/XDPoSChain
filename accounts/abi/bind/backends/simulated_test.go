@@ -116,7 +116,7 @@ func TestSimulatedBackend_EstimateGas(t *testing.T) {
 			GasPrice: big.NewInt(0),
 			Value:    nil,
 			Data:     common.Hex2Bytes("b9b046f9"),
-		}, 0, errors.New("always failing transaction (invalid opcode: opcode 0xfe not defined)")},
+		}, 0, errors.New("always failing transaction (invalid opcode: opcode 0xfe not defined)")}, //opcode 0xfe not defined have not change
 
 		{"Valid", XDPoSChain.CallMsg{
 			From:     addr,
