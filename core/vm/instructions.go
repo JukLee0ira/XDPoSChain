@@ -17,13 +17,20 @@
 package vm
 
 import (
+	"math/big"
 	"sync/atomic"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/common/math"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
+)
+
+var (
+	bigZero = new(big.Int)
+	tt255   = math.BigPow(2, 255)
 )
 
 func opAdd(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
