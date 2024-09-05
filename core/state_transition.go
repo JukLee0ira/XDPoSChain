@@ -77,10 +77,10 @@ type Message interface {
 // ExecutionResult includes all output after executing given evm
 // message no matter the execution itself is successful or not.
 type ExecutionResult struct {
-	UsedGas      uint64 // Total used gas but include the refunded gas
-	Err          error  // Any error encountered during the execution(listed in core/vm/errors.go)
-	ReturnData   []byte // Returned data from evm(function result or data supplied with revert opcode)
-	RevertReason []byte // Reason to perform revert thrown by solidity code
+	UsedGas    uint64 // Total used gas but include the refunded gas
+	Err        error  // Any error encountered during the execution(listed in core/vm/errors.go)
+	ReturnData []byte // Returned data from evm(function result or data supplied with revert opcode)
+	//RevertReason []byte // Reason to perform revert thrown by solidity code
 }
 
 // Unwrap returns the internal evm error which allows us for further
@@ -167,7 +167,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, owner common.Address) (*ExecutionResult, error, error) {
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, owner common.Address) (*ExecutionResult, error) {
 	return NewStateTransition(evm, msg, gp).TransitionDb(owner)
 }
 
@@ -259,7 +259,7 @@ func (st *StateTransition) preCheck() error {
 //
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
-func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult, error, error) {
+func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -272,7 +272,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 
 	// Check clauses 1-3, buy gas if everything is correct
 	if err := st.preCheck(); err != nil {
-		return nil, err, nil
+		return nil, err
 	}
 	msg := st.msg
 	sender := st.from() // err checked in preCheck
@@ -283,16 +283,16 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead)
 	if err != nil {
-		return nil, err, nil
+		return nil, err
 	}
 	if st.gas < gas {
-		return nil, ErrIntrinsicGas, nil
+		return nil, ErrIntrinsicGas
 	}
 	st.gas -= gas
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.CanTransfer(st.state, msg.From(), msg.Value()) {
-		return nil, ErrInsufficientFundsForTransfer, nil
+		return nil, ErrInsufficientFundsForTransfer
 	}
 	if rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber); rules.IsEIP1559 {
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
@@ -323,7 +323,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 		UsedGas:    st.gasUsed(),
 		Err:        vmerr,
 		ReturnData: ret,
-	}, nil, vmerr
+	}, nil
 }
 
 func (st *StateTransition) refundGas() {

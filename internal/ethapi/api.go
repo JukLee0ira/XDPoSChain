@@ -1479,10 +1479,24 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 			return 0, err
 		}
 		if failed {
-			if result != nil && len(result.RevertReason) != 0 {
-				return 0, fmt.Errorf("Reverted %x", result.RevertReason)
+			if result != nil && result.Err != vm.ErrOutOfGas {
+				var revert string
+				if len(result.Revert()) > 0 {
+					ret, err := abi.UnpackRevert(result.Revert())
+					if err != nil {
+						revert = hexutil.Encode(result.Revert())
+					} else {
+						revert = ret
+					}
+				}
+				return 0, estimateGasError{
+					error:  "always failing transaction",
+					vmerr:  result.Err,
+					revert: revert,
+				}
 			}
-			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
+			// Otherwise, the specified gas cap is too low
+			return 0, estimateGasError{error: fmt.Sprintf("gas required exceeds allowance (%d)", cap)}
 		}
 	}
 	return hexutil.Uint64(hi), nil
@@ -1971,12 +1985,12 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 			return nil, 0, nil, err
 		}
 		// TODO: determine the value of owner
-		res, err, vmErr := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), owner)
+		res, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()), owner)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to apply transaction: %v err: %v", args.toTransaction().Hash(), err)
 		}
 		if tracer.Equal(prevTracer) {
-			return accessList, res.UsedGas, vmErr, nil
+			return accessList, res.UsedGas, res.Err, nil
 		}
 		prevTracer = tracer
 	}

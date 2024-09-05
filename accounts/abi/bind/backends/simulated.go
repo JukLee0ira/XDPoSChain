@@ -425,7 +425,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call XDPoSChain.Cal
 	vmenv := vm.NewEVM(evmContext, statedb, nil, b.config, vm.Config{})
 	gaspool := new(core.GasPool).AddGas(math.MaxUint64)
 	owner := common.Address{}
-	result, err, _ := core.NewStateTransition(vmenv, msg, gaspool).TransitionDb(owner)
+	result, err := core.NewStateTransition(vmenv, msg, gaspool).TransitionDb(owner)
 	return result, err
 }
 
