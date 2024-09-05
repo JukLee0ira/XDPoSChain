@@ -1430,17 +1430,40 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 
 		result, err, vmErr := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
 		if err != nil {
-			if err == core.ErrIntrinsicGas {
-				return true, nil, nil, nil, nil // Special case, raise gas limit
+			if errors.Is(err, vm.ErrOutOfGas) || errors.Is(err, core.ErrIntrinsicGas) {
+				return false, nil, nil, nil, nil // Special case, raise gas limit
 			}
-			return true, nil, nil, err, nil // Bail out
+			return false, nil, nil, err, nil // Bail out
+
+			// 	if err == core.ErrIntrinsicGas {
+			// 		return true, nil, nil, nil, nil // Special case, raise gas limit
+			// 	}
+			// 	return true, nil, nil, err, nil // Bail out
 		}
+		// if failed {
+		// 	return false, res, nil, vmErr
+		// }
+
 		return result.Failed(), result.Return(), result, nil, vmErr
 	}
+
+	// If the transaction is a plain value transfer, short circuit estimation and
+	// directly try 21000. Returning 21000 without any execution is dangerous as
+	// some tx field combos might bump the price up even for plain transfers (e.g.
+	// unused access list items). Ever so slightly wasteful, but safer overall.
+	if args.Data == nil || len(*args.Data) == 0 {
+		if args.To != nil && state.GetCodeSize(*args.To) == 0 {
+			ok, _, _, err, _ := executable(params.TxGas)
+			if ok && err == nil {
+				return hexutil.Uint64(params.TxGas), nil
+			}
+		}
+	}
+
 	// Execute the binary search and hone in on an executable gas limit
 	for lo+1 < hi {
 		mid := (hi + lo) / 2
-		failed, _, _, _, err := executable(mid)
+		ok, _, _, _, err := executable(mid)
 
 		// If the error is not nil(consensus error), it means the provided message
 		// call or transaction will never be accepted no matter how much gas it is
@@ -1448,7 +1471,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 		if err != nil {
 			return 0, err
 		}
-		if failed {
+		if !ok {
 			lo = mid
 		} else {
 			hi = mid
@@ -1456,11 +1479,11 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	}
 	// Reject the transaction as invalid if it still fails at the highest allowance
 	if hi == cap {
-		failed, res, result, err, vmErr := executable(hi)
+		ok, res, result, err, vmErr := executable(hi)
 		if err != nil {
 			return 0, err
 		}
-		if failed {
+		if !ok {
 			if vmErr != vm.ErrOutOfGas {
 				if len(res) > 0 {
 					return 0, newRevertError(res)
