@@ -1393,6 +1393,9 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	if state == nil || err != nil {
 		return 0, err
 	}
+	if err = overrides.Apply(state); err != nil {
+		return 0, err
+	}
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
@@ -1425,26 +1428,21 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	cap = hi
 
 	// Create a helper to check if a gas allowance results in an executable transaction
-	executable := func(gas uint64) (bool, []byte, *core.ExecutionResult, error, error) {
+	executable := func(gas uint64) (bool, []byte, error, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		result, err, vmErr := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
+		res, _, failed, err, vmErr := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
 		if err != nil {
 			if errors.Is(err, vm.ErrOutOfGas) || errors.Is(err, core.ErrIntrinsicGas) {
-				return false, nil, nil, nil, nil // Special case, raise gas limit
+				return false, nil, nil, nil // Special case, raise gas limit
 			}
-			return false, nil, nil, err, nil // Bail out
-
-			// 	if err == core.ErrIntrinsicGas {
-			// 		return true, nil, nil, nil, nil // Special case, raise gas limit
-			// 	}
-			// 	return true, nil, nil, err, nil // Bail out
+			return false, nil, err, nil // Bail out
 		}
-		// if failed {
-		// 	return false, res, nil, vmErr
-		// }
+		if failed {
+			return false, res, nil, vmErr
+		}
 
-		return result.Failed(), result.Return(), result, nil, vmErr
+		return true, nil, nil, nil
 	}
 
 	// If the transaction is a plain value transfer, short circuit estimation and
@@ -1453,7 +1451,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	// unused access list items). Ever so slightly wasteful, but safer overall.
 	if args.Data == nil || len(*args.Data) == 0 {
 		if args.To != nil && state.GetCodeSize(*args.To) == 0 {
-			ok, _, _, err, _ := executable(params.TxGas)
+			ok, _, err, _ := executable(params.TxGas)
 			if ok && err == nil {
 				return hexutil.Uint64(params.TxGas), nil
 			}
@@ -1463,26 +1461,29 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	// Execute the binary search and hone in on an executable gas limit
 	for lo+1 < hi {
 		mid := (hi + lo) / 2
-		ok, _, _, _, err := executable(mid)
+		ok, _, err, _ := executable(mid)
 
 		// If the error is not nil(consensus error), it means the provided message
 		// call or transaction will never be accepted no matter how much gas it is
-		// assigened. Return the error directly, don't struggle any more.
+		// assigned. Return the error directly, don't struggle any more.
 		if err != nil {
 			return 0, err
 		}
+
 		if !ok {
 			lo = mid
 		} else {
 			hi = mid
 		}
 	}
+
 	// Reject the transaction as invalid if it still fails at the highest allowance
 	if hi == cap {
-		ok, res, result, err, vmErr := executable(hi)
+		ok, res, err, vmErr := executable(hi)
 		if err != nil {
 			return 0, err
 		}
+
 		if !ok {
 			if vmErr != vm.ErrOutOfGas {
 				if len(res) > 0 {
@@ -1490,27 +1491,9 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 				}
 				return 0, vmErr
 			}
-			if result != nil {
-				if result.Err != vm.ErrOutOfGas {
-					var revert string
-					if len(result.Revert()) > 0 {
-						ret, err := abi.UnpackRevert(result.Revert())
-						if err != nil {
-							revert = hexutil.Encode(result.Revert())
-						} else {
-							revert = ret
-						}
-					}
-					return 0, estimateGasError{
-						error:  "always failing transaction",
-						vmerr:  result.Err,
-						revert: revert,
-					}
 
-				}
-			}
 			// Otherwise, the specified gas cap is too low
-			return 0, estimateGasError{error: fmt.Sprintf("gas required exceeds allowance (%d)", cap)}
+			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
 		}
 	}
 	return hexutil.Uint64(hi), nil
