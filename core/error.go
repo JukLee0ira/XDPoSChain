@@ -84,4 +84,16 @@ var (
 
 	// ErrGasUintOverflow is returned when calculating gas usage.
 	ErrGasUintOverflow = errors.New("gas uint64 overflow")
+
+	// ErrInsufficientIntrinsicGas is returned when the gas limit speicified in transaction
+	// is not enought to cover intrinsic gas usage.
+	ErrInsufficientIntrinsicGas = errors.New("insufficient intrinsic gas")
 )
+
+type ConsensusError struct {
+	Reason error
+}
+
+func (ce *ConsensusError) Unwarp() error {
+	return ce.Reason
+}
