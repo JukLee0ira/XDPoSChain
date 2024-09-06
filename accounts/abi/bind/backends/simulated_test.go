@@ -51,7 +51,33 @@ func TestSimulatedBackend_EstimateGas(t *testing.T) {
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 	opts := bind.NewKeyedTransactor(key)
 
-	sim := NewXDCSimulatedBackend(core.GenesisAlloc{addr: {Balance: big.NewInt(params.Ether)}}, 10000000, params.TestXDPoSMockChainConfig)
+	sim := NewXDCSimulatedBackend(core.GenesisAlloc{addr: {Balance: big.NewInt(params.Ether)}}, 10000000, &params.ChainConfig{
+		ChainId:             big.NewInt(1337),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.Hash{},
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		Ethash:              new(params.EthashConfig),
+		Clique:              nil,
+		XDPoS: &params.XDPoSConfig{
+			Epoch:            900,
+			Gap:              450,
+			SkipV1Validation: true,
+			Reward:           250,
+			V2: &params.V2{
+				SwitchBlock:   big.NewInt(900),
+				CurrentConfig: params.UnitTestV2Configs[0],
+				AllConfigs:    params.UnitTestV2Configs,
+			},
+		},
+	},
+	)
+
 	defer sim.Close()
 
 	parsed, _ := abi.JSON(strings.NewReader(contractAbi))
