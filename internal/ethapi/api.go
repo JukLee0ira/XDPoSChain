@@ -1432,7 +1432,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 
 		result, err := DoCall(ctx, b, args, blockNrOrHash, nil, vm.Config{}, 0, gasCap)
 		if err != nil {
-			if err == core.ErrInsufficientIntrinsicGas {
+			if err == core.ErrIntrinsicGas {
 				return true, nil, nil
 			}
 			return true, nil, err
