@@ -32,6 +32,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/XDCx"
 	"github.com/XinFinOrg/XDPoSChain/cmd/utils"
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/eth/ethconfig"
 	"github.com/XinFinOrg/XDPoSChain/internal/debug"
 	"github.com/XinFinOrg/XDPoSChain/log"
@@ -246,14 +247,15 @@ func makeFullNode(ctx *cli.Context) (*node.Node, XDCConfig) {
 	// Register XDCX's OrderBook service if requested.
 	// enable in default
 	utils.RegisterXDCXService(stack, &cfg.XDCX)
-	utils.RegisterEthService(stack, &cfg.Eth)
+	eth := utils.RegisterEthService(stack, &cfg.Eth)
 
 	// Warn users to migrate if they have a legacy freezer format.
 	if eth != nil {
 		firstIdx := uint64(0)
 		// Hack to speed up check for mainnet because we know
 		// the first non-empty block.
-		if ctx.GlobalIsSet(utils.MainnetFlag.Name) {
+		ghash := core.GetCanonicalHash(eth.ChainDb(), 0)
+		if cfg.Eth.NetworkId == 1 && ghash == params.MainnetGenesisHash {
 			firstIdx = 46147
 		}
 		isLegacy, _, err := dbHasLegacyReceipts(eth.ChainDb(), firstIdx)
