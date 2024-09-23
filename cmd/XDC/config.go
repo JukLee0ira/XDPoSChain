@@ -248,6 +248,16 @@ func makeFullNode(ctx *cli.Context) (*node.Node, XDCConfig) {
 	utils.RegisterXDCXService(stack, &cfg.XDCX)
 	utils.RegisterEthService(stack, &cfg.Eth)
 
+	// Warn users to migrate if they have a legacy freezer format.
+	if eth != nil {
+		isLegacy, _, err := dbHasLegacyReceipts(eth.ChainDb())
+		if err != nil {
+			utils.Fatalf("Failed to check db for legacy receipts: %v", err)
+		}
+		if isLegacy {
+			log.Warn("Database has receipts with a legacy format. Please run `geth db freezer-migrate`.")
+		}
+	}
 	// Whisper must be explicitly enabled by specifying at least 1 whisper flag or in dev mode
 	shhEnabled := enableWhisper(ctx)
 	shhAutoEnabled := !ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name) && ctx.GlobalIsSet(utils.DeveloperFlag.Name)

@@ -873,6 +873,12 @@ func (db *MongoDatabase) Sync() error {
 	return errNotSupported
 }
 
+// MigrateTable processes the entries in a given table in sequence
+// converting them to a new format if they're of an old format.
+func (db *MongoDatabase) MigrateTable(kind string, convert func([]byte) ([]byte, error)) error {
+	return errNotSupported
+}
+
 func (db *MongoDatabase) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	panic("NewIterator from XDCxDAO mongodb is not supported")
 }
