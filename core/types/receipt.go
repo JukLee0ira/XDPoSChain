@@ -248,12 +248,9 @@ type ReceiptForStorage Receipt
 // EncodeRLP implements rlp.Encoder, and flattens all content fields of a receipt
 // into an RLP stream.
 func (r *ReceiptForStorage) EncodeRLP(w io.Writer) error {
-	enc := &v3StoredReceiptRLP{
+	enc := &storedReceiptRLP{
 		PostStateOrStatus: (*Receipt)(r).statusEncoding(),
 		CumulativeGasUsed: r.CumulativeGasUsed,
-		Bloom:             r.Bloom,
-		TxHash:            r.TxHash,
-		ContractAddress:   r.ContractAddress,
 		Logs:              make([]*Log, len(r.Logs)),
 	}
 	for i, log := range r.Logs {
