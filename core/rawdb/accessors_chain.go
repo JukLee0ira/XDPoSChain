@@ -261,7 +261,7 @@ type storedReceiptRLP struct {
 	Bloom             types.Bloom
 	TxHash            common.Hash
 	ContractAddress   common.Address
-	Logs              []*types.LogForStorage
+	Logs              []*types.Log
 	GasUsed           uint64
 }
 
@@ -278,10 +278,7 @@ func (r *receiptLogs) DecodeRLP(s *rlp.Stream) error {
 	if err := s.Decode(&stored); err != nil {
 		return err
 	}
-	r.Logs = make([]*types.Log, len(stored.Logs))
-	for i, log := range stored.Logs {
-		r.Logs[i] = (*types.Log)(log)
-	}
+	r.Logs = stored.Logs
 	return nil
 }
 

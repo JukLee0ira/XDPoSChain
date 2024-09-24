@@ -32,7 +32,6 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/XDCx"
 	"github.com/XinFinOrg/XDPoSChain/cmd/utils"
 	"github.com/XinFinOrg/XDPoSChain/common"
-	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/eth/ethconfig"
 	"github.com/XinFinOrg/XDPoSChain/internal/debug"
 	"github.com/XinFinOrg/XDPoSChain/log"
@@ -247,25 +246,7 @@ func makeFullNode(ctx *cli.Context) (*node.Node, XDCConfig) {
 	// Register XDCX's OrderBook service if requested.
 	// enable in default
 	utils.RegisterXDCXService(stack, &cfg.XDCX)
-	eth := utils.RegisterEthService(stack, &cfg.Eth)
-
-	// Warn users to migrate if they have a legacy freezer format.
-	if eth != nil {
-		firstIdx := uint64(0)
-		// Hack to speed up check for mainnet because we know
-		// the first non-empty block.
-		ghash := core.GetCanonicalHash(eth.ChainDb(), 0)
-		if cfg.Eth.NetworkId == 1 && ghash == params.MainnetGenesisHash {
-			firstIdx = 46147
-		}
-		isLegacy, _, err := dbHasLegacyReceipts(eth.ChainDb(), firstIdx)
-		if err != nil {
-			utils.Fatalf("Failed to check db for legacy receipts: %v", err)
-		}
-		if isLegacy {
-			log.Warn("Database has receipts with a legacy format. Please run `geth db freezer-migrate`.")
-		}
-	}
+	utils.RegisterEthService(stack, &cfg.Eth)
 	// Whisper must be explicitly enabled by specifying at least 1 whisper flag or in dev mode
 	shhEnabled := enableWhisper(ctx)
 	shhAutoEnabled := !ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name) && ctx.GlobalIsSet(utils.DeveloperFlag.Name)
