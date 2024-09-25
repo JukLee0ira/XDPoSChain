@@ -160,12 +160,6 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	return backend
 }
 
-// Close terminates the underlying blockchain's update loop.
-func (b *SimulatedBackend) Close() error {
-	b.blockchain.Stop()
-	return nil
-}
-
 // Commit imports all the pending transactions as a single block and starts a
 // fresh new state.
 func (b *SimulatedBackend) Commit() {

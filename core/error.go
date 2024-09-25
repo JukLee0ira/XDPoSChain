@@ -65,9 +65,6 @@ var (
 	// is higher than the balance of the user's account.
 	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
 
-	// ErrGasOverflow is returned when calculating gas usage.
-	ErrGasOverflow = errors.New("gas overflow")
-
 	// ErrIntrinsicGas is returned if the transaction is specified to use less gas
 	// than required to start the invocation.
 	ErrIntrinsicGas = errors.New("intrinsic gas too low")
@@ -84,16 +81,4 @@ var (
 
 	// ErrGasUintOverflow is returned when calculating gas usage.
 	ErrGasUintOverflow = errors.New("gas uint64 overflow")
-
-	// ErrInsufficientIntrinsicGas is returned when the gas limit speicified in transaction
-	// is not enought to cover intrinsic gas usage.
-	ErrInsufficientIntrinsicGas = errors.New("insufficient intrinsic gas")
 )
-
-type ConsensusError struct {
-	Reason error
-}
-
-func (ce *ConsensusError) Unwarp() error {
-	return ce.Reason
-}
