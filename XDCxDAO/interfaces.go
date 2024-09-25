@@ -46,7 +46,6 @@ type XDCXDAO interface {
 	AppendAncient(number uint64, hash, header, body, receipt, td []byte) error
 	TruncateAncients(n uint64) error
 	Sync() error
-	MigrateTable(string, func([]byte) ([]byte, error)) error //type convertLegacyFn = func([]byte) ([]byte, error)
 	NewIterator(prefix []byte, start []byte) ethdb.Iterator
 
 	Stat(property string) (string, error)
