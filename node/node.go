@@ -233,29 +233,6 @@ func (n *Node) Start() error {
 	return nil
 }
 
-// Close stops the Node and releases resources acquired in
-// Node constructor New.
-func (n *Node) Close() error {
-	var errs []error
-
-	// Terminate all subsystems and collect any errors
-	if err := n.Stop(); err != nil && err != ErrNodeStopped {
-		errs = append(errs, err)
-	}
-	if err := n.accman.Close(); err != nil {
-		errs = append(errs, err)
-	}
-	// Report any errors that might have occurred
-	switch len(errs) {
-	case 0:
-		return nil
-	case 1:
-		return errs[0]
-	default:
-		return fmt.Errorf("%v", errs)
-	}
-}
-
 func (n *Node) openDataDir() error {
 	if n.config.DataDir == "" {
 		return nil // ephemeral

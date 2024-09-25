@@ -13,36 +13,29 @@ import (
 )
 
 // RegisterEthService adds an Ethereum client to the stack.
-func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) *eth.Ethereum {
+func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) {
 	var err error
 	if cfg.SyncMode == downloader.LightSync {
 		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			return les.New(ctx, cfg)
 		})
-		if err != nil {
-			Fatalf("Failed to register the Ethereum service: %v", err)
-		}
-		return nil
+	} else {
+		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+			var XDCXServ *XDCx.XDCX
+			ctx.Service(&XDCXServ)
+			var lendingServ *XDCxlending.Lending
+			ctx.Service(&lendingServ)
+			fullNode, err := eth.New(ctx, cfg, XDCXServ, lendingServ)
+			if fullNode != nil && cfg.LightServ > 0 {
+				ls, _ := les.NewLesServer(fullNode, cfg)
+				fullNode.AddLesServer(ls)
+			}
+			return fullNode, err
+		})
 	}
-	var backend *eth.Ethereum
-	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var XDCXServ *XDCx.XDCX
-		ctx.Service(&XDCXServ)
-		var lendingServ *XDCxlending.Lending
-		ctx.Service(&lendingServ)
-		fullNode, err := eth.New(ctx, cfg, XDCXServ, lendingServ)
-		if fullNode != nil && cfg.LightServ > 0 {
-			ls, _ := les.NewLesServer(fullNode, cfg)
-			fullNode.AddLesServer(ls)
-		}
-		backend = fullNode
-		return fullNode, err
-	})
-
 	if err != nil {
 		Fatalf("Failed to register the Ethereum service: %v", err)
 	}
-	return backend
 }
 
 // RegisterShhService configures Whisper and adds it to the given node.
