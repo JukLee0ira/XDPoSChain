@@ -153,7 +153,7 @@ func requireUniqueStructFieldNames(args Arguments) error {
 //	used, pair them.
 //
 // Note this function assumes the given value is a struct value.
-func mapToStructFields(argNames []string, value reflect.Value) (map[string]string, error) {
+func mapArgNamesToStructFields(argNames []string, value reflect.Value) (map[string]string, error) {
 	typ := value.Type()
 
 	abi2struct := make(map[string]string)

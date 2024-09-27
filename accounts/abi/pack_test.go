@@ -567,7 +567,6 @@ func TestMethodPack(t *testing.T) {
 	sig = append(sig, common.LeftPadBytes([]byte{2}, 32)...)
 	sig = append(sig, common.LeftPadBytes([]byte{1}, 32)...)
 	sig = append(sig, common.LeftPadBytes([]byte{2}, 32)...)
-
 	packed, err = abi.Pack("nestedSlice", [][]uint8{{1, 2}, {1, 2}})
 	if err != nil {
 		t.Fatal(err)
