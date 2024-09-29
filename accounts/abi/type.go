@@ -239,7 +239,7 @@ func (t Type) pack(v reflect.Value) ([]byte, error) {
 		offset := 0
 		offsetReq := isDynamicType(*t.Elem)
 		if offsetReq {
-			offset = getDynamicTypeOffset(*t.Elem) * v.Len()
+			offset = getTypeSize(*t.Elem) * v.Len()
 		}
 		var tail []byte
 		for i := 0; i < v.Len(); i++ {
@@ -254,6 +254,44 @@ func (t Type) pack(v reflect.Value) ([]byte, error) {
 			ret = append(ret, packNum(reflect.ValueOf(offset))...)
 			offset += len(val)
 			tail = append(tail, val...)
+		}
+		return append(ret, tail...), nil
+	case TupleTy:
+		// (T1,...,Tk) for k >= 0 and any types T1, …, Tk
+		// enc(X) = head(X(1)) ... head(X(k)) tail(X(1)) ... tail(X(k))
+		// where X = (X(1), ..., X(k)) and head and tail are defined for Ti being a static
+		// type as
+		//     head(X(i)) = enc(X(i)) and tail(X(i)) = "" (the empty string)
+		// and as
+		//     head(X(i)) = enc(len(head(X(1)) ... head(X(k)) tail(X(1)) ... tail(X(i-1))))
+		//     tail(X(i)) = enc(X(i))
+		// otherwise, i.e. if Ti is a dynamic type.
+		fieldmap, err := mapArgNamesToStructFields(t.TupleRawNames, v)
+		if err != nil {
+			return nil, err
+		}
+		// Calculate prefix occupied size.
+		offset := 0
+		for _, elem := range t.TupleElems {
+			offset += getTypeSize(*elem)
+		}
+		var ret, tail []byte
+		for i, elem := range t.TupleElems {
+			field := v.FieldByName(fieldmap[t.TupleRawNames[i]])
+			if !field.IsValid() {
+				return nil, fmt.Errorf("field %s for tuple not found in the given struct", t.TupleRawNames[i])
+			}
+			val, err := elem.pack(field)
+			if err != nil {
+				return nil, err
+			}
+			if isDynamicType(*elem) {
+				ret = append(ret, packNum(reflect.ValueOf(offset))...)
+				tail = append(tail, val...)
+				offset += len(val)
+			} else {
+				ret = append(ret, val...)
+			}
 		}
 		return append(ret, tail...), nil
 	default:
