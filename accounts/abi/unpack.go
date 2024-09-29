@@ -140,10 +140,7 @@ func forEachUnpack(t Type, output []byte, start, size int) (interface{}, error) 
 
 	// Arrays have packed elements, resulting in longer unpack steps.
 	// Slices have just 32 bytes per element (pointing to the contents).
-	elemSize := 32
-	if t.T == ArrayTy {
-		elemSize = getFullElemSize(t.Elem)
-	}
+	elemSize := getTypeSize(*t.Elem)
 
 	for i, j := start, 0; j < size; i, j = i+elemSize, j+1 {
 		inter, err := toGoType(i, *t.Elem, output)
@@ -224,9 +221,13 @@ func toGoType(index int, t Type, output []byte) (interface{}, error) {
 			return forTupleUnpack(t, output[index:])
 		}
 	case SliceTy:
-		return forEachUnpack(t, output, begin, end)
+		return forEachUnpack(t, output[begin:], 0, length)
 	case ArrayTy:
-		return forEachUnpack(t, output, index, t.Size)
+		if isDynamicType(*t.Elem) {
+			offset := int64(binary.BigEndian.Uint64(returnOutput[len(returnOutput)-8:]))
+			return forEachUnpack(t, output[offset:], 0, t.Size)
+		}
+		return forEachUnpack(t, output[index:], 0, t.Size)
 	case StringTy: // variable arrays are written at the end of the return bytes
 		return string(output[begin : begin+length]), nil
 	case IntTy, UintTy:

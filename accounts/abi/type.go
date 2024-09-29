@@ -241,6 +241,31 @@ func (t Type) pack(v reflect.Value) ([]byte, error) {
 	}
 }
 
+// getTypeSize returns the size that this type needs to occupy.
+// We distinguish static and dynamic types. Static types are encoded in-place
+// and dynamic types are encoded at a separately allocated location after the
+// current block.
+// So for a static variable, the size returned represents the size that the
+// variable actually occupies.
+// For a dynamic variable, the returned size is fixed 32 bytes, which is used
+// to store the location reference for actual value storage.
+func getTypeSize(t Type) int {
+	if t.T == ArrayTy && !isDynamicType(*t.Elem) {
+		// Recursively calculate type size if it is a nested array
+		if t.Elem.T == ArrayTy {
+			return t.Size * getTypeSize(*t.Elem)
+		}
+		return t.Size * 32
+	} else if t.T == TupleTy && !isDynamicType(t) {
+		total := 0
+		for _, elem := range t.TupleElems {
+			total += getTypeSize(*elem)
+		}
+		return total
+	}
+	return 32
+}
+
 // requireLengthPrefix returns whether the type requires any sort of length
 // prefixing.
 func (t Type) requiresLengthPrefix() bool {
@@ -248,12 +273,21 @@ func (t Type) requiresLengthPrefix() bool {
 }
 
 // isDynamicType returns true if the type is dynamic.
-// StringTy, BytesTy, and SliceTy(irrespective of slice element type) are dynamic types
-// ArrayTy is considered dynamic if and only if the Array element is a dynamic type.
-// This function recursively checks the type for slice and array elements.
+// The following types are called “dynamic”:
+// * bytes
+// * string
+// * T[] for any T
+// * T[k] for any dynamic T and any k >= 0
+// * (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k
 func isDynamicType(t Type) bool {
-	// dynamic types
-	// array is also a dynamic type if the array type is dynamic
+	if t.T == TupleTy {
+		for _, elem := range t.TupleElems {
+			if isDynamicType(*elem) {
+				return true
+			}
+		}
+		return false
+	}
 	return t.T == StringTy || t.T == BytesTy || t.T == SliceTy || (t.T == ArrayTy && isDynamicType(*t.Elem))
 }
 

@@ -181,7 +181,7 @@ func UnpackRevert(data []byte) (string, error) {
 	}
 	switch {
 	case bytes.Equal(data[:4], revertSelector):
-		typ, err := NewType("string")
+		typ, err := NewType("string", nil)
 		if err != nil {
 			return "", err
 		}
@@ -191,7 +191,7 @@ func UnpackRevert(data []byte) (string, error) {
 		}
 		return unpacked[0].(string), nil
 	case bytes.Equal(data[:4], panicSelector):
-		typ, err := NewType("uint256")
+		typ, err := NewType("uint256", nil)
 		if err != nil {
 			return "", err
 		}

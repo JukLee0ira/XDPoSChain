@@ -98,9 +98,9 @@ func (arguments Arguments) Unpack(v interface{}, data []byte) error {
 		return err
 	}
 	if arguments.isTuple() {
-		return arguments.unpackTuple(v, marshalledValues)
+		return unpackTuple(arguments, v, marshalledValues)
 	}
-	return arguments.unpackAtomic(v, marshalledValues)
+	return unpackAtomic(arguments[0], v, marshalledValues[0])
 }
 
 // Unpack2 performs the operation hexdata -> Go format.
@@ -114,8 +114,78 @@ func (arguments Arguments) Unpack2(data []byte) ([]interface{}, error) {
 	return arguments.UnpackValues(data)
 }
 
-func (arguments Arguments) unpackTuple(v interface{}, marshalledValues []interface{}) error {
+// unpack sets the unmarshalled value to go format.
+// Note the dst here must is settable.
+func unpack(t *Type, dst interface{}, src interface{}) error {
+	var (
+		dstVal = reflect.ValueOf(dst).Elem()
+		srcVal = reflect.ValueOf(src)
+	)
 
+	if t.T != TupleTy && !((t.T == SliceTy || t.T == ArrayTy) && t.Elem.T == TupleTy) {
+		return set(dstVal, srcVal)
+	}
+
+	switch t.T {
+	case TupleTy:
+		if dstVal.Kind() != reflect.Struct {
+			return fmt.Errorf("abi: invalid dst value for unpack, want struct, got %s", dstVal.Kind())
+		}
+		for i, elem := range t.TupleElems {
+			fname := t.Type.Field(i).Name
+			field := dstVal.FieldByName(fname)
+			if !field.IsValid() {
+				return fmt.Errorf("abi: field %s can't found in the given value", fname)
+			}
+			if err := unpack(elem, field.Addr().Interface(), srcVal.FieldByName(fname).Interface()); err != nil {
+				return err
+			}
+		}
+		return nil
+	case SliceTy:
+		if dstVal.Kind() != reflect.Slice {
+			return fmt.Errorf("abi: invalid dst value for unpack, want slice, got %s", dstVal.Kind())
+		}
+		slice := reflect.MakeSlice(dstVal.Type(), srcVal.Len(), srcVal.Len())
+		for i := 0; i < slice.Len(); i++ {
+			if err := unpack(t.Elem, slice.Index(i).Addr().Interface(), srcVal.Index(i).Interface()); err != nil {
+				return err
+			}
+		}
+		dstVal.Set(slice)
+	case ArrayTy:
+		if dstVal.Kind() != reflect.Array {
+			return fmt.Errorf("abi: invalid dst value for unpack, want array, got %s", dstVal.Kind())
+		}
+		array := reflect.New(dstVal.Type()).Elem()
+		for i := 0; i < array.Len(); i++ {
+			if err := unpack(t.Elem, array.Index(i).Addr().Interface(), srcVal.Index(i).Interface()); err != nil {
+				return err
+			}
+		}
+		dstVal.Set(array)
+	}
+	return nil
+}
+
+func unpackAtomic(argument Argument, v interface{}, marshalledValues interface{}) error {
+	elem := reflect.ValueOf(v).Elem()
+
+	if elem.Kind() == reflect.Struct {
+		structMap, err := mapToStructFields([]string{argument.Name}, elem)
+		if err != nil {
+			return err
+		}
+		field := elem.FieldByName(structMap[argument.Name])
+		if !field.IsValid() {
+			return fmt.Errorf("abi: field %s can't be found in the given value", argument.Name)
+		}
+		return unpack(&argument.Type, field.Addr().Interface(), marshalledValues)
+	}
+	return unpack(&argument.Type, elem.Addr().Interface(), marshalledValues)
+}
+
+func unpackTuple(arguments Arguments, v interface{}, marshalledValues []interface{}) error {
 	var (
 		value = reflect.ValueOf(v).Elem()
 		typ   = value.Type()
@@ -125,16 +195,28 @@ func (arguments Arguments) unpackTuple(v interface{}, marshalledValues []interfa
 		return err
 	}
 	// If the output interface is a struct, make sure names don't collide
+	var (
+		abi2struct map[string]string
+		err        error
+	)
 	if kind == reflect.Struct {
-		if err := requireUniqueStructFieldNames(arguments); err != nil {
+		var argNames []string
+		for _, arg := range arguments {
+			argNames = append(argNames, arg.Name)
+		}
+		abi2struct, err = mapToStructFields(argNames, value)
+		if err != nil {
 			return err
 		}
 	}
 	for i, arg := range arguments.NonIndexed() {
 		switch kind {
 		case reflect.Struct:
-			err := unpackStruct(value, reflectValue, arg)
-			if err != nil {
+			field := value.FieldByName(abi2struct[arg.Name])
+			if !field.IsValid() {
+				return fmt.Errorf("abi: field %s can't be found in the given value", arg.Name)
+			}
+			if err := unpack(&arg.Type, field.Addr().Interface(), marshalledValues[i]); err != nil {
 				return err
 			}
 		case reflect.Slice, reflect.Array:
@@ -155,43 +237,6 @@ func (arguments Arguments) unpackTuple(v interface{}, marshalledValues []interfa
 	return nil
 }
 
-// unpackAtomic unpacks ( hexdata -> go ) a single value
-func (arguments Arguments) unpackAtomic(v interface{}, marshalledValues []interface{}) error {
-	if len(marshalledValues) != 1 {
-		return fmt.Errorf("abi: wrong length, expected single value, got %d", len(marshalledValues))
-	}
-	elem := reflect.ValueOf(v).Elem()
-	kind := elem.Kind()
-	reflectValue := reflect.ValueOf(marshalledValues[0])
-
-	if kind == reflect.Struct {
-		//make sure names don't collide
-		if err := requireUniqueStructFieldNames(arguments); err != nil {
-			return err
-		}
-
-		return unpackStruct(elem, reflectValue, arguments[0])
-	}
-
-	return set(elem, reflectValue, arguments.NonIndexed()[0])
-
-}
-
-// Computes the full size of an array;
-// i.e. counting nested arrays, which count towards size for unpacking.
-func getArraySize(arr *Type) int {
-	size := arr.Size
-	// Arrays can be nested, with each element being the same size
-	arr = arr.Elem
-	for arr.T == ArrayTy {
-		// Keep multiplying by elem.Size while the elem is an array.
-		size *= arr.Size
-		arr = arr.Elem
-	}
-	// Now we have the full array size, including its children.
-	return size
-}
-
 // UnpackValues can be used to unpack ABI-encoded hexdata according to the ABI-specification,
 // without supplying a struct to unpack into. Instead, this method returns a list containing the
 // values. An atomic argument will be a list with one element.
@@ -200,7 +245,7 @@ func (arguments Arguments) UnpackValues(data []byte) ([]interface{}, error) {
 	virtualArgs := 0
 	for index, arg := range arguments.NonIndexed() {
 		marshalledValue, err := toGoType((index+virtualArgs)*32, arg.Type, data)
-		if arg.Type.T == ArrayTy {
+		if arg.Type.T == ArrayTy && !isDynamicType(arg.Type) {
 			// If we have a static array, like [3]uint256, these are coded as
 			// just like uint256,uint256,uint256.
 			// This means that we need to add two 'virtual' arguments when
@@ -211,6 +256,10 @@ func (arguments Arguments) UnpackValues(data []byte) ([]interface{}, error) {
 			//
 			// Calculate the full array size to get the correct offset for the next argument.
 			// Decrement it by 1, as the normal index increment is still applied.
+			virtualArgs += getTypeSize(arg.Type)/32 - 1
+		} else if arg.Type.T == TupleTy && !isDynamicType(arg.Type) {
+			// If we have a static tuple, like (uint256, bool, uint256), these are
+			// coded as just like uint256,bool,uint256
 			virtualArgs += getTypeSize(arg.Type)/32 - 1
 		} else if arg.Type.T == TupleTy && !isDynamicType(arg.Type) {
 			// If we have a static tuple, like (uint256, bool, uint256), these are
@@ -245,7 +294,7 @@ func (arguments Arguments) Pack(args ...interface{}) ([]byte, error) {
 	// input offset is the bytes offset for packed output
 	inputOffset := 0
 	for _, abiArg := range abiArgs {
-		inputOffset += getDynamicTypeOffset(abiArg.Type)
+		inputOffset += getTypeSize(abiArg.Type)
 	}
 	var ret []byte
 	for i, a := range args {
@@ -274,6 +323,17 @@ func (arguments Arguments) Pack(args ...interface{}) ([]byte, error) {
 	return ret, nil
 }
 
+// ToCamelCase converts an under-score string to a camel-case string
+func ToCamelCase(input string) string {
+	parts := strings.Split(input, "_")
+	for i, s := range parts {
+		if len(s) > 0 {
+			parts[i] = strings.ToUpper(s[:1]) + s[1:]
+		}
+	}
+	return strings.Join(parts, "")
+}
+
 // capitalise makes the first character of a string upper case, also removing any
 // prefixing underscores from the variable names.
 func capitalise(input string) string {
@@ -293,7 +353,7 @@ func unpackStruct(value, reflectValue reflect.Value, arg Argument) error {
 	for j := 0; j < typ.NumField(); j++ {
 		// TODO read tags: `abi:"fieldName"`
 		if typ.Field(j).Name == name {
-			if err := set(value.Field(j), reflectValue, arg); err != nil {
+			if err := set(value.Field(j), reflectValue); err != nil {
 				return err
 			}
 		}
