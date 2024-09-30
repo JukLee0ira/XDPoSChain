@@ -763,7 +763,7 @@ func TestUnpackTuple(t *testing.T) {
 			t.Errorf("unexpected value unpacked: want %x, got %x", 1, v.Ret.A)
 		}
 		if v.Ret.B.Cmp(big.NewInt(-1)) != 0 {
-			t.Errorf("unexpected value unpacked: want %x, got %x", v.Ret.B, -1)
+			t.Errorf("unexpected value unpacked: want %x, got %x", -1, v.Ret.B)
 		}
 	}
 
