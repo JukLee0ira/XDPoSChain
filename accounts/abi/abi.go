@@ -75,6 +75,25 @@ func (abi ABI) Pack(name string, args ...interface{}) ([]byte, error) {
 	return append(method.Id(), arguments...), nil
 }
 
+func (abi ABI) getArguments(name string, data []byte) (Arguments, error) {
+	// since there can't be naming collisions with contracts and events,
+	// we need to decide whether we're calling a method or an event
+	var args Arguments
+	if method, ok := abi.Methods[name]; ok {
+		if len(data)%32 != 0 {
+			return nil, fmt.Errorf("abi: improperly formatted output: %q - Bytes: %+v", data, data)
+		}
+		args = method.Outputs
+	}
+	if event, ok := abi.Events[name]; ok {
+		args = event.Inputs
+	}
+	if args == nil {
+		return nil, fmt.Errorf("abi: could not locate named method or event: %s", name)
+	}
+	return args, nil
+}
+
 // Unpack output in v according to the abi specification
 func (abi ABI) Unpack(v interface{}, name string, output []byte) (err error) {
 	if len(output) == 0 {
@@ -91,6 +110,15 @@ func (abi ABI) Unpack(v interface{}, name string, output []byte) (err error) {
 		return event.Inputs.Unpack(v, output)
 	}
 	return errors.New("abi: could not locate named method or event")
+}
+
+// UnpackIntoMap unpacks a log into the provided map[string]interface{}.
+func (abi ABI) UnpackIntoMap(v map[string]interface{}, name string, data []byte) (err error) {
+	args, err := abi.getArguments(name, data)
+	if err != nil {
+		return err
+	}
+	return args.UnpackIntoMap(v, data)
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface
