@@ -18,6 +18,7 @@ package native
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -58,7 +59,8 @@ func NewContractTracer(cfg json.RawMessage) (tracers.Tracer, error) {
 	// handle invalid opcode case
 	op := vm.StringToOp(t.config.OpCode)
 	if op == 0 && t.config.OpCode != "STOP" && t.config.OpCode != "" {
-		t.config.OpCode = "inv"
+		t.reason = fmt.Errorf("opcode %s not defined", t.config.OpCode)
+		return nil, t.reason
 	}
 	return t, nil
 }
@@ -106,8 +108,8 @@ func (t *contractTracer) Stop(err error) {
 }
 
 func validateAndStoreOpCode(t *contractTracer, input []byte, to common.Address) {
-	// If the OpCode is "inv" or if the OpCode is not empty and doesn't match the input, exit early.
-	if t.config.OpCode == "inv" || (t.config.OpCode != "" && !findOpcodes(input, vm.StringToOp(t.config.OpCode))) {
+	// If the OpCode is not empty and doesn't match the input, exit early.
+	if t.config.OpCode != "" && !findOpcodes(input, vm.StringToOp(t.config.OpCode)) {
 		return
 	}
 	// If WithByteCode is true, store the input in the address mapping as hex.
