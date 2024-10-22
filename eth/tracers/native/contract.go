@@ -66,8 +66,8 @@ func NewContractTracer(cfg json.RawMessage) (tracers.Tracer, error) {
 }
 
 func (t *contractTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
-	if create {
-		validateAndStoreOpCode(t, input, to)
+	if create || t.config.OpCode == "CALL" {
+		storeOpCode(t, env, to, input)
 	}
 }
 
@@ -75,20 +75,26 @@ func (t *contractTracer) CaptureEnd(output []byte, gasUsed uint64, _ time.Durati
 }
 
 func (t *contractTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+	// Skip if tracing was interrupted
+	if atomic.LoadUint32(&t.interrupt) > 0 {
+		// TODO: env.Cancel()
+		return
+	}
+	// If the OpCode is empty , exit early.
+	if t.config.OpCode == "" {
+		return
+	}
+	if op.String() == t.config.OpCode {
+		addr := scope.Contract.Address()
+		bytecode := env.StateDB.GetCode(addr)
+		storeOpCode(t, nil, addr, bytecode)
+	}
 }
 
 func (t *contractTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, _ *vm.ScopeContext, depth int, err error) {
 }
 
 func (t *contractTracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
-	// Skip if tracing was interrupted
-	if atomic.LoadUint32(&t.interrupt) > 0 {
-		// TODO: env.Cancel()
-		return
-	}
-	if typ == vm.CREATE || typ == vm.CREATE2 {
-		validateAndStoreOpCode(t, input, to)
-	}
 }
 
 func (t *contractTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
@@ -107,30 +113,15 @@ func (t *contractTracer) Stop(err error) {
 	atomic.StoreUint32(&t.interrupt, 1)
 }
 
-func validateAndStoreOpCode(t *contractTracer, input []byte, to common.Address) {
-	// If the OpCode is not empty and doesn't match the input, exit early.
-	if t.config.OpCode != "" && !findOpcodes(input, vm.StringToOp(t.config.OpCode)) {
-		return
-	}
-	// If WithByteCode is true, store the input in the address mapping as hex.
+func storeOpCode(t *contractTracer, env *vm.EVM, addr common.Address, code []byte) {
+	t.Addrs[addrToHex(addr)] = ""
 	if t.config.WithByteCode {
-		t.Addrs[addrToHex(to)] = bytesToHex(input)
-	} else {
-		t.Addrs[addrToHex(to)] = ""
-	}
-}
-
-// Compare bytecode with the given opcode, skipping PUSH instructions.
-func findOpcodes(bytecode []byte, opcode vm.OpCode) bool {
-	for i := 0; i < len(bytecode); {
-		op := vm.OpCode(bytecode[i])
-		// Skip PUSH opcodes and their arguments
-		if op.IsPush() {
-			i += int(op - 95) // Directly calculate the number of bytes to skip
-		} else if op == opcode {
-			return true
+		if env != nil {
+			//SetCode with input code
+			env.StateDB.SetCode(addr, code)
+			code = env.StateDB.GetCode(addr)
 		}
-		i++
+		t.Addrs[addrToHex(addr)] = bytesToHex(code)
 	}
-	return false
+
 }
