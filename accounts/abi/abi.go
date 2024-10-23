@@ -97,9 +97,6 @@ func (abi ABI) getArguments(name string, data []byte) (Arguments, error) {
 
 // Unpack output in v according to the abi specification
 func (abi ABI) Unpack(v interface{}, name string, data []byte) (err error) {
-	if len(data) == 0 {
-		return fmt.Errorf("abi: unmarshalling empty output")
-	}
 	// since there can't be naming collisions with contracts and events,
 	// we need to decide whether we're calling a method or an event
 	if method, ok := abi.Methods[name]; ok {
@@ -237,7 +234,7 @@ func UnpackRevert(data []byte) (string, error) {
 	}
 	switch {
 	case bytes.Equal(data[:4], revertSelector):
-		typ, err := NewType("string", nil)
+		typ, err := NewType("string", "", nil)
 		if err != nil {
 			return "", err
 		}
@@ -247,7 +244,7 @@ func UnpackRevert(data []byte) (string, error) {
 		}
 		return unpacked[0].(string), nil
 	case bytes.Equal(data[:4], panicSelector):
-		typ, err := NewType("uint256", nil)
+		typ, err := NewType("uint256", "", nil)
 		if err != nil {
 			return "", err
 		}

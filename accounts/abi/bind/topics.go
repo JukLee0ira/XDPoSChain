@@ -80,13 +80,18 @@ func makeTopics(query ...[]interface{}) ([][]common.Hash, error) {
 				copy(topic[:], hash[:])
 
 			default:
+				// todo(rjl493456442) according solidity documentation, indexed event
+				// parameters that are not value types i.e. arrays and structs are not
+				// stored directly but instead a keccak256-hash of an encoding is stored.
+				//
+				// We only convert stringS and bytes to hash, still need to deal with
+				// array(both fixed-size and dynamic-size) and struct.
+
 				// Attempt to generate the topic from funky types
 				val := reflect.ValueOf(rule)
-
 				switch {
 				case val.Kind() == reflect.Array && reflect.TypeOf(rule).Elem().Kind() == reflect.Uint8:
 					reflect.Copy(reflect.ValueOf(topic[common.HashLength-val.Len():]), val)
-
 				default:
 					return nil, fmt.Errorf("unsupported indexed type: %T", rule)
 				}

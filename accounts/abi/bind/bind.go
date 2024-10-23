@@ -201,7 +201,7 @@ func arrayBindingGo(inner string, arraySizes []string) string {
 // from all Solidity types to Go ones (e.g. uint17), those that cannot be exactly
 // mapped will use an upscaled type (e.g. *big.Int).
 func bindTypeGo(kind abi.Type) string {
-	stringKind := kind.String()
+	stringKind := kind.TupleRawName + kind.String()
 	innerLen, innerMapping := bindUnnestedTypeGo(stringKind)
 	return arrayBindingGo(wrapArray(stringKind, innerLen, innerMapping))
 }
@@ -249,7 +249,7 @@ func arrayBindingJava(inner string, arraySizes []string) string {
 // from all Solidity types to Java ones (e.g. uint17), those that cannot be exactly
 // mapped will use an upscaled type (e.g. BigDecimal).
 func bindTypeJava(kind abi.Type) string {
-	stringKind := kind.String()
+	stringKind := kind.TupleRawName + kind.String()
 	innerLen, innerMapping := bindUnnestedTypeJava(stringKind)
 	return arrayBindingJava(wrapArray(stringKind, innerLen, innerMapping))
 }
@@ -319,6 +319,12 @@ var bindTopicType = map[Lang]func(kind abi.Type) string{
 // bindTypeGo converts a Solidity topic type to a Go one. It is almost the same
 // funcionality as for simple types, but dynamic types get converted to hashes.
 func bindTopicTypeGo(kind abi.Type) string {
+	// todo(rjl493456442) according solidity documentation, indexed event
+	// parameters that are not value types i.e. arrays and structs are not
+	// stored directly but instead a keccak256-hash of an encoding is stored.
+	//
+	// We only convert stringS and bytes to hash, still need to deal with
+	// array(both fixed-size and dynamic-size) and struct.
 	bound := bindTypeGo(kind)
 	if bound == "string" || bound == "[]byte" {
 		bound = "common.Hash"
@@ -329,6 +335,13 @@ func bindTopicTypeGo(kind abi.Type) string {
 // bindTypeGo converts a Solidity topic type to a Java one. It is almost the same
 // funcionality as for simple types, but dynamic types get converted to hashes.
 func bindTopicTypeJava(kind abi.Type) string {
+
+	// todo(rjl493456442) according solidity documentation, indexed event
+	// parameters that are not value types i.e. arrays and structs are not
+	// stored directly but instead a keccak256-hash of an encoding is stored.
+	//
+	// We only convert stringS and bytes to hash, still need to deal with
+	// array(both fixed-size and dynamic-size) and struct.
 	bound := bindTypeJava(kind)
 	if bound == "String" || bound == "Bytes" {
 		bound = "Hash"
@@ -453,4 +466,19 @@ func structured(args abi.Arguments) bool {
 		exists[field] = true
 	}
 	return true
+}
+
+// hasStruct returns an indicator whether the given type is struct, struct slice
+// or struct array.
+func hasStruct(t abi.Type) bool {
+	switch t.T {
+	case abi.SliceTy:
+		return hasStruct(*t.Elem)
+	case abi.ArrayTy:
+		return hasStruct(*t.Elem)
+	case abi.TupleTy:
+		return true
+	default:
+		return false
+	}
 }

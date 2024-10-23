@@ -441,7 +441,7 @@ func TestPack(t *testing.T) {
 				"0500000000000000000000000000000000000000000000000000000000000000"), // array[1][2]
 		},
 	} {
-		typ, err := NewType(test.typ, nil)
+		typ, err := NewType(test.typ, "", nil)
 		if err != nil {
 			t.Fatalf("%v failed. Unexpected parse error: %v", i, err)
 		}
