@@ -1370,8 +1370,7 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	if err != nil {
 		return nil, err
 	}
-	msg.BalanceTokenFee = new(big.Int).SetUint64(msg.GasLimit)
-	msg.BalanceTokenFee.Mul(msg.BalanceTokenFee, msg.GasPrice)
+	msg.SetBalanceTokenFeeForCall()
 
 	// Get a new instance of the EVM.
 	evm, vmError, err := b.GetEVM(ctx, msg, statedb, XDCxState, header, &vm.Config{NoBaseFee: true})

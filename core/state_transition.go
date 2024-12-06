@@ -139,6 +139,11 @@ type Message struct {
 	SkipAccountChecks bool
 }
 
+func (m *Message) SetBalanceTokenFeeForCall() {
+	m.BalanceTokenFee = new(big.Int).SetUint64(m.GasLimit)
+	m.BalanceTokenFee.Mul(m.BalanceTokenFee, m.GasPrice)
+}
+
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, balanceFee, blockNumber, baseFee *big.Int) (*Message, error) {
 	msg := &Message{
