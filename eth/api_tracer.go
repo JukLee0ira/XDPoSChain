@@ -242,7 +242,7 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 						}
 					}
 					header := task.block.Header()
-					msg, _ := tx.AsMessage(signer, balance, header.Number, header.BaseFee)
+					msg, _ := core.TransactionToMessage(tx, signer, balance, header.Number, header.BaseFee)
 					txctx := &tracers.Context{
 						BlockHash: task.block.Hash(),
 						TxIndex:   i,
@@ -520,7 +520,7 @@ func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, 
 		}
 		// Generate the next state snapshot fast without tracing
 		header := block.Header()
-		msg, _ := tx.AsMessage(signer, balance, header.Number, header.BaseFee)
+		msg, _ := core.TransactionToMessage(tx, signer, balance, header.Number, header.BaseFee)
 		txContext := core.NewEVMTxContext(msg)
 		statedb.SetTxContext(tx.Hash(), i)
 

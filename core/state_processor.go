@@ -247,7 +247,7 @@ func applyTransaction(config *params.ChainConfig, tokensFee map[common.Address]*
 		}
 	}
 	// msg, err := tx.AsMessage(types.MakeSigner(config, blockNumber), balanceFee, blockNumber)
-	msg, err := tx.AsMessage(types.MakeSigner(config, blockNumber), balanceFee, blockNumber, baseFee)
+	msg, err := TransactionToMessage(tx, types.MakeSigner(config, blockNumber), balanceFee, blockNumber, baseFee)
 	if err != nil {
 		return nil, 0, err, false
 	}
@@ -430,7 +430,7 @@ func applyTransaction(config *params.ChainConfig, tokensFee map[common.Address]*
 	receipt.GasUsed = result.UsedGas
 
 	// If the transaction created a contract, store the creation address in the receipt.
-	if msg.To() == nil {
+	if msg.To == nil {
 		receipt.ContractAddress = crypto.CreateAddress(evm.TxContext.Origin, tx.Nonce())
 	}
 

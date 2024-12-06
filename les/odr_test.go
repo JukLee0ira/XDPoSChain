@@ -109,10 +109,6 @@ func odrAccounts(ctx context.Context, db ethdb.Database, config *params.ChainCon
 //
 //func TestOdrContractCallLes2(t *testing.T) { testOdr(t, 2, 2, odrContractCall) }
 
-type callmsg struct {
-	types.Message
-}
-
 func (callmsg) CheckNonce() bool { return false }
 
 func odrContractCall(ctx context.Context, db ethdb.Database, config *params.ChainConfig, bc *core.BlockChain, lc *light.LightChain, bhash common.Hash) []byte {
@@ -133,8 +129,18 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 				if value, ok := feeCapacity[testContractAddr]; ok {
 					balanceTokenFee = value
 				}
-				msg := callmsg{types.NewMessage(from.Address(), &testContractAddr, 0, new(big.Int), 100000, big.NewInt(params.InitialBaseFee), big.NewInt(params.InitialBaseFee), new(big.Int), data, nil, true, balanceTokenFee, header.Number)}
-
+				msg := &core.Message{
+					From:              from.Address(),
+					To:                &testContractAddr,
+					Value:             new(big.Int),
+					GasLimit:          100000,
+					GasPrice:          big.NewInt(params.InitialBaseFee),
+					GasFeeCap:         big.NewInt(params.InitialBaseFee),
+					GasTipCap:         new(big.Int),
+					Data:              data,
+					SkipAccountChecks: true,
+					// msg := callmsg{types.NewMessage(from.Address(), &testContractAddr, 0, new(big.Int), 100000, big.NewInt(params.InitialBaseFee), big.NewInt(params.InitialBaseFee), new(big.Int), data, nil, true, balanceTokenFee, header.Number)}
+				}
 				context := core.NewEVMBlockContext(header, bc, nil)
 				txContext := core.NewEVMTxContext(msg)
 				vmenv := vm.NewEVM(context, txContext, statedb, nil, config, vm.Config{NoBaseFee: true})
@@ -154,7 +160,18 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 			if value, ok := feeCapacity[testContractAddr]; ok {
 				balanceTokenFee = value
 			}
-			msg := callmsg{types.NewMessage(testBankAddress, &testContractAddr, 0, new(big.Int), 100000, big.NewInt(params.InitialBaseFee), big.NewInt(params.InitialBaseFee), new(big.Int), data, nil, true, balanceTokenFee, header.Number)}
+			// msg := callmsg{types.NewMessage(testBankAddress, &testContractAddr, 0, new(big.Int), 100000, big.NewInt(params.InitialBaseFee), big.NewInt(params.InitialBaseFee), new(big.Int), data, nil, true, balanceTokenFee, header.Number)}
+			msg := &core.Message{
+				From:              testBankAddress,
+				To:                &testContractAddr,
+				Value:             new(big.Int),
+				GasLimit:          1000000,
+				GasPrice:          big.NewInt(params.InitialBaseFee),
+				GasFeeCap:         big.NewInt(params.InitialBaseFee),
+				GasTipCap:         new(big.Int),
+				Data:              data,
+				SkipAccountChecks: true,
+			}
 			context := core.NewEVMBlockContext(header, lc, nil)
 			txContext := core.NewEVMTxContext(msg)
 			vmenv := vm.NewEVM(context, txContext, statedb, nil, config, vm.Config{NoBaseFee: true})
