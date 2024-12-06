@@ -386,7 +386,7 @@ func applyTransaction(config *params.ChainConfig, tokensFee map[common.Address]*
 		blockMap[9147453] = "0x3538a544021c07869c16b764424c5987409cba48"
 		blockMap[9147459] = "0xe187cf86c2274b1f16e8225a7da9a75aba4f1f5f"
 
-		addrFrom := msg.From().Hex()
+		addrFrom := msg.From.Hex()
 
 		currentBlockNumber := blockNumber.Int64()
 		if addr, ok := blockMap[currentBlockNumber]; ok {
@@ -441,7 +441,7 @@ func applyTransaction(config *params.ChainConfig, tokensFee map[common.Address]*
 	receipt.BlockNumber = blockNumber
 	receipt.TransactionIndex = uint(statedb.TxIndex())
 	if balanceFee != nil && result.Failed() {
-		state.PayFeeWithTRC21TxFail(statedb, msg.From(), *to)
+		state.PayFeeWithTRC21TxFail(statedb, msg.From, *to)
 	}
 	return receipt, result.UsedGas, err, balanceFee != nil
 }
