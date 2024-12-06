@@ -300,19 +300,8 @@ func (args *TransactionArgs) ToMessage(b Backend, number *big.Int, globalGasCap 
 	if args.AccessList != nil {
 		accessList = *args.AccessList
 	}
-
-	msg := &core.Message{
-		From:              addr,
-		To:                args.To,
-		Value:             value,
-		GasLimit:          gas,
-		GasPrice:          gasPrice,
-		GasFeeCap:         gasFeeCap,
-		GasTipCap:         gasTipCap,
-		Data:              data,
-		AccessList:        accessList,
-		SkipAccountChecks: true,
-	}
+	msg := core.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true, nil, number)
+	msg.SkipAccountChecks = true
 	return msg, nil
 }
 

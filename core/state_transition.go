@@ -139,6 +139,25 @@ type Message struct {
 	SkipAccountChecks bool
 }
 
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList types.AccessList, isFake bool, balanceTokenFee *big.Int, number *big.Int) *Message {
+	if balanceTokenFee != nil {
+		gasPrice = common.GetGasPrice(number)
+	}
+	return &Message{
+		From:            from,
+		To:              to,
+		Nonce:           nonce,
+		Value:           amount,
+		GasLimit:        gasLimit,
+		GasPrice:        gasPrice,
+		GasFeeCap:       gasFeeCap,
+		GasTipCap:       gasTipCap,
+		Data:            data,
+		AccessList:      accessList,
+		BalanceTokenFee: balanceTokenFee,
+	}
+}
+
 func (m *Message) SetBalanceTokenFeeForCall() {
 	m.BalanceTokenFee = new(big.Int).SetUint64(m.GasLimit)
 	m.BalanceTokenFee.Mul(m.BalanceTokenFee, m.GasPrice)
