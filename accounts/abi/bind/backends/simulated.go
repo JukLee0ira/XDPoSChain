@@ -722,22 +722,33 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	from := stateDB.GetOrNewStateObject(call.From)
 	from.SetBalance(math.MaxBig256)
 	// Execute the call.
-	msg := callMsg{call}
+	msg := &core.Message{
+		From:              call.From,
+		To:                call.To,
+		Value:             call.Value,
+		GasLimit:          call.Gas,
+		GasPrice:          call.GasPrice,
+		GasFeeCap:         call.GasFeeCap,
+		GasTipCap:         call.GasTipCap,
+		Data:              call.Data,
+		AccessList:        call.AccessList,
+		SkipAccountChecks: true,
+	}
 	feeCapacity := state.GetTRC21FeeCapacityFromState(stateDB)
-	if msg.To() != nil {
-		if value, ok := feeCapacity[*msg.To()]; ok {
-			msg.CallMsg.BalanceTokenFee = value
+	if msg.To != nil {
+		if value, ok := feeCapacity[*msg.To]; ok {
+			msg.BalanceTokenFee = value
 		}
 	}
 
-	txContext := core.NewEVMTxContext(msg)
-	evmContext := core.NewEVMBlockContext(block.Header(), b.blockchain, nil)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
+	txContext := core.NewEVMTxContext(msg)
+	evmContext := core.NewEVMBlockContext(block.Header(), b.blockchain, nil)
 	vmenv := vm.NewEVM(evmContext, txContext, stateDB, nil, b.config, vm.Config{NoBaseFee: true})
 	gaspool := new(core.GasPool).AddGas(gomath.MaxUint64)
 	owner := common.Address{}
-	return core.NewStateTransition(vmenv, msg, gaspool).TransitionDb(owner)
+	return core.ApplyMessage(vmenv, msg, gaspool, owner)
 }
 
 // SendTransaction updates the pending block to include the given transaction.
@@ -902,24 +913,6 @@ func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 func (b *SimulatedBackend) BlockChain() *core.BlockChain {
 	return b.blockchain
 }
-
-// callMsg implements core.Message to allow passing it as a transaction simulator.
-type callMsg struct {
-	ethereum.CallMsg
-}
-
-func (m callMsg) From() common.Address         { return m.CallMsg.From }
-func (m callMsg) Nonce() uint64                { return 0 }
-func (m callMsg) IsFake() bool                 { return true }
-func (m callMsg) To() *common.Address          { return m.CallMsg.To }
-func (m callMsg) GasPrice() *big.Int           { return m.CallMsg.GasPrice }
-func (m callMsg) GasFeeCap() *big.Int          { return m.CallMsg.GasFeeCap }
-func (m callMsg) GasTipCap() *big.Int          { return m.CallMsg.GasTipCap }
-func (m callMsg) Gas() uint64                  { return m.CallMsg.Gas }
-func (m callMsg) Value() *big.Int              { return m.CallMsg.Value }
-func (m callMsg) Data() []byte                 { return m.CallMsg.Data }
-func (m callMsg) BalanceTokenFee() *big.Int    { return m.CallMsg.BalanceTokenFee }
-func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.

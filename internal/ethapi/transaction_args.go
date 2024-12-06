@@ -26,6 +26,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/common/hexutil"
+	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
@@ -223,10 +224,10 @@ func (args *TransactionArgs) setLondonFeeDefaults(ctx context.Context, head *typ
 // ToMessage converts the transaction arguments to the Message type used by the
 // core evm. This method is used in calls and traces that do not require a real
 // live transaction.
-func (args *TransactionArgs) ToMessage(b Backend, number *big.Int, globalGasCap uint64, baseFee *big.Int) (types.Message, error) {
+func (args *TransactionArgs) ToMessage(b Backend, number *big.Int, globalGasCap uint64, baseFee *big.Int) (*core.Message, error) {
 	// Reject invalid combinations of pre- and post-1559 fee styles
 	if args.GasPrice != nil && (args.MaxFeePerGas != nil || args.MaxPriorityFeePerGas != nil) {
-		return types.Message{}, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
+		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
 	}
 
 	// Set sender address or use zero address if none specified.
@@ -302,8 +303,8 @@ func (args *TransactionArgs) ToMessage(b Backend, number *big.Int, globalGasCap 
 	if args.AccessList != nil {
 		accessList = *args.AccessList
 	}
-
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true, nil, number)
+	msg := core.NewMessage(addr, args.To, 0, value, gas, gasPrice, gasFeeCap, gasTipCap, data, accessList, true, nil, number)
+	msg.SkipAccountChecks = true
 	return msg, nil
 }
 
