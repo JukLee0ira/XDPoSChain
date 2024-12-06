@@ -344,7 +344,7 @@ func (b *backendMock) GetTd(common.Hash) *big.Int {
 	return nil
 }
 
-func (b *backendMock) GetEVM(context.Context, core.Message, *state.StateDB, *tradingstate.TradingStateDB, *types.Header, *vm.Config) (*vm.EVM, func() error, error) {
+func (b *backendMock) GetEVM(context.Context, *core.Message, *state.StateDB, *tradingstate.TradingStateDB, *types.Header, *vm.Config) (*vm.EVM, func() error, error) {
 	return nil, nil, nil
 }
 

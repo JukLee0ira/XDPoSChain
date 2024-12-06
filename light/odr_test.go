@@ -190,6 +190,7 @@ func odrContractCall(ctx context.Context, db ethdb.Database, bc *core.BlockChain
 			GasTipCap:         new(big.Int),
 			Data:              data,
 			SkipAccountChecks: true,
+			BalanceTokenFee:   balanceTokenFee,
 		}
 		txContext := core.NewEVMTxContext(msg)
 		context := core.NewEVMBlockContext(header, chain, nil)

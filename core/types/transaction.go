@@ -771,15 +771,6 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 	heap.Pop(&t.heads)
 }
 
-func (m *Message) SetBalanceTokenFeeForCall() {
-	m.balanceTokenFee = new(big.Int).SetUint64(m.gasLimit)
-	m.balanceTokenFee.Mul(m.balanceTokenFee, m.gasPrice)
-}
-
-func (m *Message) SetBalanceTokenFee(balanceTokenFee *big.Int) {
-	m.balanceTokenFee = balanceTokenFee
-}
-
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {
 	if a == nil {

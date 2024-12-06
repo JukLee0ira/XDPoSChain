@@ -1370,7 +1370,8 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	if err != nil {
 		return nil, err
 	}
-	msg.SetBalanceTokenFeeForCall()
+	msg.BalanceTokenFee = new(big.Int).SetUint64(msg.GasLimit)
+	msg.BalanceTokenFee.Mul(msg.BalanceTokenFee, msg.GasPrice)
 
 	// Get a new instance of the EVM.
 	evm, vmError, err := b.GetEVM(ctx, msg, statedb, XDCxState, header, &vm.Config{NoBaseFee: true})
@@ -2086,7 +2087,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		if value, ok := feeCapacity[to]; ok {
 			balanceTokenFee = value
 		}
-		msg.SetBalanceTokenFee(balanceTokenFee)
+		msg.BalanceTokenFee = balanceTokenFee
 
 		// Apply the transaction with the access list tracer
 		tracer := vm.NewAccessListTracer(accessList, args.from(), to, precompiles)

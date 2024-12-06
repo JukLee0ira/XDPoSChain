@@ -119,7 +119,7 @@ func CallContractWithState(call ethereum.CallMsg, chain consensus.ChainContext, 
 	feeCapacity := state.GetTRC21FeeCapacityFromState(statedb)
 	if msg.To != nil {
 		if value, ok := feeCapacity[*msg.To]; ok {
-			msg.CallMsg.BalanceTokenFee = value
+			msg.BalanceTokenFee = value
 		}
 	}
 	txContext := NewEVMTxContext(msg)
