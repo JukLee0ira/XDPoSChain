@@ -121,16 +121,17 @@ func toWordSize(size uint64) uint64 {
 // A Message contains the data derived from a single transaction that is relevant to state
 // processing.
 type Message struct {
-	To         *common.Address
-	From       common.Address
-	Nonce      uint64
-	Value      *big.Int
-	GasLimit   uint64
-	GasPrice   *big.Int
-	GasFeeCap  *big.Int
-	GasTipCap  *big.Int
-	Data       []byte
-	AccessList types.AccessList
+	To              *common.Address
+	From            common.Address
+	Nonce           uint64
+	Value           *big.Int
+	GasLimit        uint64
+	GasPrice        *big.Int
+	GasFeeCap       *big.Int
+	GasTipCap       *big.Int
+	Data            []byte
+	AccessList      types.AccessList
+	balanceTokenFee *big.Int
 
 	// When SkipAccountCheckss is true, the message nonce is not checked against the
 	// account nonce in state. It also disables checking that the sender is an EOA.
@@ -139,7 +140,7 @@ type Message struct {
 }
 
 // TransactionToMessage converts a transaction into a Message.
-func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
+func TransactionToMessage(tx *types.Transaction, s types.Signer, balanceFee, blockNumber, baseFee *big.Int) (*Message, error) {
 	msg := &Message{
 		Nonce:             tx.Nonce(),
 		GasLimit:          tx.Gas(),
@@ -151,11 +152,33 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		Data:              tx.Data(),
 		AccessList:        tx.AccessList(),
 		SkipAccountChecks: false,
+		balanceTokenFee:   balanceFee,
+		// 	}
+		// 	// If baseFee provided, set gasPrice to effectiveGasPrice.
+		// 	if baseFee != nil {
+		// 		msg.GasPrice = cmath.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
+		// 	}
+		// 	var err error
+		// 	msg.From, err = types.Sender(s, tx)
+		// 	return msg, err
+		// }
 	}
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	if baseFee != nil {
+
+	if balanceFee != nil {
+		if blockNumber != nil {
+			if blockNumber.Cmp(common.BlockNumberGas50x) >= 0 {
+				msg.GasPrice = common.GasPrice50x
+			} else if blockNumber.Cmp(common.TIPTRC21Fee) > 0 {
+				msg.GasPrice = common.TRC21GasPrice
+			} else {
+				msg.GasPrice = common.TRC21GasPriceBefore
+			}
+		}
+	} else if baseFee != nil {
+		// If baseFee provided, set gasPrice to effectiveGasPrice.
 		msg.GasPrice = cmath.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
 	}
+
 	var err error
 	msg.From, err = types.Sender(s, tx)
 	return msg, err

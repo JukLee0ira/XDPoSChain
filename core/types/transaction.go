@@ -424,42 +424,6 @@ func (tx *Transaction) EffectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.In
 	return tx.inner.effectiveGasPrice(dst, baseFee)
 }
 
-// AsMessage returns the transaction as a core.Message.
-func (tx *Transaction) AsMessage(s Signer, balanceFee, blockNumber, baseFee *big.Int) (Message, error) {
-	msg := Message{
-		nonce:           tx.Nonce(),
-		gasLimit:        tx.Gas(),
-		gasPrice:        new(big.Int).Set(tx.GasPrice()),
-		gasFeeCap:       new(big.Int).Set(tx.GasFeeCap()),
-		gasTipCap:       new(big.Int).Set(tx.GasTipCap()),
-		to:              tx.To(),
-		amount:          tx.Value(),
-		data:            tx.Data(),
-		accessList:      tx.AccessList(),
-		isFake:          false,
-		balanceTokenFee: balanceFee,
-	}
-
-	if balanceFee != nil {
-		if blockNumber != nil {
-			if blockNumber.Cmp(common.BlockNumberGas50x) >= 0 {
-				msg.gasPrice = common.GasPrice50x
-			} else if blockNumber.Cmp(common.TIPTRC21Fee) > 0 {
-				msg.gasPrice = common.TRC21GasPrice
-			} else {
-				msg.gasPrice = common.TRC21GasPriceBefore
-			}
-		}
-	} else if baseFee != nil {
-		// If baseFee provided, set gasPrice to effectiveGasPrice.
-		msg.gasPrice = math.BigMin(msg.gasPrice.Add(msg.gasTipCap, baseFee), msg.gasFeeCap)
-	}
-
-	var err error
-	msg.from, err = Sender(s, tx)
-	return msg, err
-}
-
 // WithSignature returns a new transaction with the given signature.
 // This signature needs to be in the [R || S || V] format where V is 0 or 1.
 func (tx *Transaction) WithSignature(signer Signer, sig []byte) (*Transaction, error) {
