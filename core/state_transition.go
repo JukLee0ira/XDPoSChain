@@ -299,7 +299,11 @@ func (st *StateTransition) buyGas() error {
 			balanceCheck = balanceCheck.Mul(balanceCheck, st.msg.GasFeeCap)
 			balanceCheck.Add(balanceCheck, st.msg.Value)
 		}
-		if have, want := st.state.GetBalance(st.msg.From), balanceCheck; have.Cmp(want) < 0 {
+		balanceCheckU256, overflow := uint256.FromBig(balanceCheck)
+		if overflow {
+			return fmt.Errorf("%w: address %v required balance exceeds 256 bits", ErrInsufficientFunds, st.msg.From.Hex())
+		}
+		if have, want := st.state.GetBalance(st.msg.From), balanceCheckU256; have.Cmp(want) < 0 {
 			return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From.Hex(), have, want)
 		}
 	} else if balanceTokenFee.Cmp(mgval) < 0 {
@@ -312,7 +316,8 @@ func (st *StateTransition) buyGas() error {
 
 	st.initialGas = st.msg.GasLimit
 	if balanceTokenFee == nil {
-		st.state.SubBalance(st.msg.From, mgval)
+		mgvalU256, _ := uint256.FromBig(mgval)
+		st.state.SubBalance(st.msg.From, mgvalU256)
 	}
 	return nil
 }
@@ -484,7 +489,9 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 	if balanceTokenFee == nil {
 		from := st.from()
 		// Return ETH for remaining gas, exchanged at the original rate.
-		remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gasRemaining), st.msg.GasPrice)
+		// remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
+		remaining := uint256.NewInt(st.gasRemaining)
+		remaining = remaining.Mul(remaining, uint256.MustFromBig(st.msg.GasPrice))
 		st.state.AddBalance(from.Address(), remaining)
 	}
 	// Also return remaining gas to the block gas counter so it is

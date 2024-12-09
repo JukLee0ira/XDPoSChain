@@ -20,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/holiman/uint256"
 )
 
 type journalEntry interface {
@@ -50,7 +51,7 @@ type (
 	// Changes to individual accounts.
 	balanceChange struct {
 		account *common.Address
-		prev    *big.Int
+		prev    *uint256.Int
 	}
 	nonceChange struct {
 		account *common.Address
