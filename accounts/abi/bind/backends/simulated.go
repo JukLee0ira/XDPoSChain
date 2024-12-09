@@ -215,7 +215,7 @@ func (b *SimulatedBackend) BalanceAt(ctx context.Context, contract common.Addres
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
-	return statedb.GetBalance(contract), nil
+	return statedb.GetBalance(contract).ToBig(), nil
 }
 
 // NonceAt returns the nonce of a certain account in the blockchain.
