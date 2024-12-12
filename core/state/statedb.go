@@ -544,7 +544,7 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 func (s *StateDB) CreateAccount(addr common.Address) {
 	new, prev := s.createObject(addr)
 	if prev != nil {
-		new.setBalance(prev.data.Balance)
+		new.setBalance(uint256.MustFromBig(prev.data.Balance))
 	}
 }
 

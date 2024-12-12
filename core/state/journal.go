@@ -109,7 +109,7 @@ func (ch suicideChange) undo(s *StateDB) {
 	obj := s.getStateObject(*ch.account)
 	if obj != nil {
 		obj.suicided = ch.prev
-		obj.setBalance(ch.prevbalance)
+		obj.setBalance(uint256.MustFromBig(ch.prevbalance))
 	}
 }
 

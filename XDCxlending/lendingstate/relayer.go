@@ -277,7 +277,7 @@ func GetTokenBalance(addr common.Address, token common.Address, statedb *state.S
 func SetTokenBalance(addr common.Address, balance *big.Int, token common.Address, statedb *state.StateDB) error {
 	// XDC native
 	if token == common.XDCNativeAddressBinary {
-		statedb.SetBalance(addr, balance)
+		statedb.SetBalance(addr, uint256.MustFromBig(balance))
 		return nil
 	}
 
