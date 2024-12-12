@@ -48,6 +48,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/event"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
+	"github.com/holiman/uint256"
 )
 
 // This nil assignment ensures compile time that SimulatedBackend implements bind.ContractBackend.
@@ -460,7 +461,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call XDPoSChain.Cal
 	}
 	// Set infinite balance to the fake caller account.
 	from := statedb.GetOrNewStateObject(call.From)
-	from.SetBalance(math.MaxBig256)
+	from.SetBalance(uint256.MustFromBig(math.MaxBig256))
 	// Execute the call.
 	msg := &core.Message{
 		From:              call.From,

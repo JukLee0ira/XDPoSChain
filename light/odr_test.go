@@ -26,6 +26,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
+	"github.com/holiman/uint256"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/common/math"
@@ -173,7 +174,7 @@ func odrContractCall(ctx context.Context, db ethdb.Database, bc *core.BlockChain
 		}
 
 		// Perform read-only call.
-		st.SetBalance(testBankAddress, math.MaxBig256)
+		st.SetBalance(testBankAddress, uint256.MustFromBig(math.MaxBig256))
 		feeCapacity := state.GetTRC21FeeCapacityFromState(st)
 		var balanceTokenFee *big.Int
 		if value, ok := feeCapacity[testContractAddr]; ok {
