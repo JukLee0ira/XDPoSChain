@@ -460,14 +460,14 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 
 	if st.evm.Context.BlockNumber.Cmp(common.TIPTRC21Fee) > 0 {
 		if (owner != common.Address{}) {
-			st.state.AddBalance(owner, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.msg.GasPrice))
+			st.state.AddBalance(owner, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), st.msg.GasPrice))
 		}
 	} else {
 		effectiveTip := st.msg.GasPrice
 		if st.evm.ChainConfig().IsEIP1559(st.evm.Context.BlockNumber) {
 			effectiveTip = cmath.BigMin(msg.GasFeeCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 		}
-		st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+		st.state.AddBalance(st.evm.Context.Coinbase, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), effectiveTip))
 	}
 
 	return &ExecutionResult{
@@ -489,7 +489,6 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 	if balanceTokenFee == nil {
 		from := st.from()
 		// Return ETH for remaining gas, exchanged at the original rate.
-		// remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
 		remaining := uint256.NewInt(st.gasRemaining)
 		remaining = remaining.Mul(remaining, uint256.MustFromBig(st.msg.GasPrice))
 		st.state.AddBalance(from.Address(), remaining)

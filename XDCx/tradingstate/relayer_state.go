@@ -8,6 +8,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/state"
 	"github.com/XinFinOrg/XDPoSChain/crypto"
 	"github.com/XinFinOrg/XDPoSChain/log"
+	"github.com/holiman/uint256"
 	"github.com/pkg/errors"
 )
 
@@ -162,7 +163,7 @@ func AddTokenBalance(addr common.Address, value *big.Int, token common.Address, 
 	if token == common.XDCNativeAddressBinary {
 		balance := statedb.GetBalance(addr)
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: ADD TOKEN XDC NATIVE BEFORE", "token", common.XDCNativeAddress, "address", addr.String(), "balance", balance, "orderValue", value)
-		statedb.AddBalance(addr, value)
+		statedb.AddBalance(addr, uint256.MustFromBig(value))
 		balance = statedb.GetBalance(addr)
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: ADD XDC NATIVE BALANCE AFTER", "token", token.String(), "address", addr.String(), "balance", balance, "orderValue", value)
 
