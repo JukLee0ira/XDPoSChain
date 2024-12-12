@@ -613,7 +613,8 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 	if state == nil || err != nil {
 		return nil, err
 	}
-	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
+	b := state.GetBalance(address).ToBig()
+	return (*hexutil.Big)(b), state.Error()
 }
 
 // GetTransactionAndReceiptProof returns the Trie transaction and receipt proof of the given transaction hash.
@@ -758,7 +759,7 @@ func (s *PublicBlockChainAPI) GetAccountInfo(ctx context.Context, address common
 	info := state.GetAccountInfo(address)
 	result := map[string]interface{}{
 		"address":     address,
-		"balance":     (*hexutil.Big)(info.Balance),
+		"balance":     info.Balance,
 		"codeSize":    info.CodeSize,
 		"codeHash":    info.CodeHash,
 		"nonce":       info.Nonce,

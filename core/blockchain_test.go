@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
-	"github.com/holiman/uint256"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus/ethash"
@@ -1613,7 +1612,7 @@ func TestTransientStorageReset(t *testing.T) {
 
 func TestEIP3651(t *testing.T) {
 	var (
-		ConstantinopleBlockReward = uint256.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Constantinople
+		ConstantinopleBlockReward = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Constantinople
 
 		aa     = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
 		bb     = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
@@ -1706,9 +1705,9 @@ func TestEIP3651(t *testing.T) {
 	state, _ := chain.State()
 
 	// 3: Ensure that miner received only the tx's tip.
-	actual := state.GetBalance(block.Coinbase())
-	expected := new(uint256.Int).Add(
-		new(uint256.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
+	actual := state.GetBalance(block.Coinbase()).ToBig()
+	expected := new(big.Int).Add(
+		new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
 		ConstantinopleBlockReward,
 	)
 	if actual.Cmp(expected) != 0 {
@@ -1716,8 +1715,8 @@ func TestEIP3651(t *testing.T) {
 	}
 
 	// 4: Ensure the tx sender paid for the gasUsed * (tip + block baseFee).
-	actual = new(uint256.Int).Sub(funds, state.GetBalance(addr1))
-	expected = new(uint256.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
+	actual = new(big.Int).Sub(funds, state.GetBalance(addr1).ToBig())
+	expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}

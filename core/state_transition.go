@@ -435,7 +435,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 	if overflow {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From.Hex())
 	}
-	if !value.IsZero() && !st.evm.Context.CanTransfer(st.state, msg.From, msg.Value) {
+	if !value.IsZero() && !st.evm.Context.CanTransfer(st.state, msg.From, value) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From.Hex())
 	}
 
@@ -444,11 +444,11 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 	if contractCreation {
-		ret, _, st.gasRemaining, vmerr = st.evm.Create(sender, msg.Data, st.gasRemaining, st.msg.Value)
+		ret, _, st.gasRemaining, vmerr = st.evm.Create(sender, msg.Data, st.gasRemaining, value)
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(sender.Address(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to().Address(), msg.Data, st.gasRemaining, st.msg.Value)
+		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to().Address(), msg.Data, st.gasRemaining, value)
 	}
 	if !eip3529 {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
@@ -460,14 +460,17 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 
 	if st.evm.Context.BlockNumber.Cmp(common.TIPTRC21Fee) > 0 {
 		if (owner != common.Address{}) {
-			st.state.AddBalance(owner, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), st.msg.GasPrice))
+			remaining := uint256.NewInt(st.gasRemaining)
+			remaining = remaining.Mul(remaining, uint256.MustFromBig(st.msg.GasPrice))
 		}
 	} else {
 		effectiveTip := st.msg.GasPrice
+		effectiveTipU256, _ := uint256.FromBig(effectiveTip)
 		if st.evm.ChainConfig().IsEIP1559(st.evm.Context.BlockNumber) {
 			effectiveTip = cmath.BigMin(msg.GasFeeCap, new(big.Int).Sub(msg.GasFeeCap, st.evm.Context.BaseFee))
 		}
-		st.state.AddBalance(st.evm.Context.Coinbase, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), effectiveTip))
+		fee := new(uint256.Int).SetUint64(st.gasUsed())
+		fee.Mul(fee, effectiveTipU256)
 	}
 
 	return &ExecutionResult{

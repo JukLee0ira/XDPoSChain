@@ -100,7 +100,7 @@ func (s *stateObject) empty() bool {
 // These objects are stored in the main account trie.
 type Account struct {
 	Nonce    uint64
-	Balance  *big.Int
+	Balance  *uint256.Int
 	Root     common.Hash // merkle root of the storage trie
 	CodeHash []byte
 }
@@ -108,7 +108,7 @@ type Account struct {
 // newObject creates a state object.
 func newObject(db *StateDB, address common.Address, data Account, onDirty func(addr common.Address)) *stateObject {
 	if data.Balance == nil {
-		data.Balance = new(big.Int)
+		data.Balance = new(uint256.Int)
 	}
 	if data.CodeHash == nil {
 		data.CodeHash = types.EmptyCodeHash.Bytes()

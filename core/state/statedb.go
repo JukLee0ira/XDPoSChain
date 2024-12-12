@@ -86,7 +86,7 @@ type StateDB struct {
 type AccountInfo struct {
 	CodeSize    int
 	Nonce       uint64
-	Balance     *big.Int
+	Balance     *uint256.Int
 	CodeHash    common.Hash
 	StorageHash common.Hash
 }
@@ -285,7 +285,7 @@ func (s *StateDB) GetAccountInfo(addr common.Address) *AccountInfo {
 
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
-		result.Balance = common.Big0
+		result.Balance = common.U2560
 		return &result
 	}
 
@@ -404,10 +404,10 @@ func (s *StateDB) Suicide(addr common.Address) bool {
 	s.journal = append(s.journal, suicideChange{
 		account:     &addr,
 		prev:        stateObject.suicided,
-		prevbalance: new(big.Int).Set(stateObject.Balance()),
+		prevbalance: new(uint256.Int).Set(stateObject.Balance()),
 	})
 	stateObject.markSuicided()
-	stateObject.data.Balance = new(big.Int)
+	stateObject.data.Balance = new(uint256.Int)
 
 	return true
 }
@@ -544,7 +544,7 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 func (s *StateDB) CreateAccount(addr common.Address) {
 	new, prev := s.createObject(addr)
 	if prev != nil {
-		new.setBalance(uint256.MustFromBig(prev.data.Balance))
+		new.setBalance(prev.data.Balance)
 	}
 }
 

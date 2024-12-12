@@ -92,7 +92,7 @@ func SubRelayerFee(relayer common.Address, fee *big.Int, statedb *state.StateDB)
 	} else {
 		balance = new(big.Int).Sub(balance, fee)
 		statedb.SetState(common.HexToAddress(common.RelayerRegistrationSMC), locHashDeposit, common.BigToHash(balance))
-		statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), fee)
+		statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), uint256.MustFromBig(fee))
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: SubRelayerFee AFTER", "relayer", relayer.String(), "balance", balance)
 		return nil
 	}
@@ -142,10 +142,10 @@ func SubTokenBalance(addr common.Address, value *big.Int, token common.Address, 
 	if token == common.XDCNativeAddressBinary {
 		balance := statedb.GetBalance(addr)
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: SUB XDC NATIVE BALANCE BEFORE", "token", common.XDCNativeAddress, "address", addr.String(), "balance", balance, "orderValue", value)
-		if balance.Cmp(value) < 0 {
+		if balance.Cmp(uint256.MustFromBig(value)) < 0 {
 			return errors.Errorf("value %s in token %s not enough , have : %s , want : %s  ", addr.String(), common.XDCNativeAddress, balance, value)
 		}
-		statedb.SubBalance(addr, value)
+		statedb.SubBalance(addr, uint256.MustFromBig(value))
 		balance = statedb.GetBalance(addr)
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: SUB XDC NATIVE BALANCE AFTER", "token", common.XDCNativeAddress, "address", addr.String(), "balance", balance, "orderValue", value)
 
@@ -298,5 +298,5 @@ func SetSubRelayerFee(relayer common.Address, balance *big.Int, fee *big.Int, st
 	locBigDeposit := new(big.Int).SetUint64(uint64(0)).Add(locBig, RelayerStructMappingSlot["_deposit"])
 	locHashDeposit := common.BigToHash(locBigDeposit)
 	statedb.SetState(common.HexToAddress(common.RelayerRegistrationSMC), locHashDeposit, common.BigToHash(balance))
-	statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), fee)
+	statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), uint256.MustFromBig(fee))
 }

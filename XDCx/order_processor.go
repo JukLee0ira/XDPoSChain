@@ -687,7 +687,7 @@ func (XDCx *XDCX) ProcessCancelOrder(header *types.Header, tradingStateDB *tradi
 	switch originOrder.Side {
 	case tradingstate.Ask:
 		// users pay token (which they have) for relayer
-		err := tradingstate.SubTokenBalance(originOrder.UserAddress, tokenCancelFee, originOrder.BaseToken, statedb)
+		err := tradingstate.SubTokenBalance(originOrder.UserAddress, uint256.MustFromBig(tokenCancelFee), originOrder.BaseToken, statedb)
 		if err != nil {
 			log.Warn("ProcessCancelOrder SubTokenBalance", "err", err, "originOrder.UserAddress", originOrder.UserAddress, "tokenCancelFee", *tokenCancelFee, "originOrder.BaseToken", originOrder.BaseToken)
 		}
@@ -697,7 +697,7 @@ func (XDCx *XDCX) ProcessCancelOrder(header *types.Header, tradingStateDB *tradi
 		}
 	case tradingstate.Bid:
 		// users pay token (which they have) for relayer
-		err := tradingstate.SubTokenBalance(originOrder.UserAddress, tokenCancelFee, originOrder.QuoteToken, statedb)
+		err := tradingstate.SubTokenBalance(originOrder.UserAddress, uint256.MustFromBig(tokenCancelFee), originOrder.QuoteToken, statedb)
 		if err != nil {
 			log.Warn("ProcessCancelOrder SubTokenBalance", "err", err, "originOrder.UserAddress", originOrder.UserAddress, "tokenCancelFee", *tokenCancelFee, "originOrder.QuoteToken", originOrder.QuoteToken)
 		}

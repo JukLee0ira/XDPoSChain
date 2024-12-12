@@ -140,7 +140,7 @@ func SubRelayerFee(relayer common.Address, fee *big.Int, statedb *state.StateDB)
 	} else {
 		balance = new(big.Int).Sub(balance, fee)
 		statedb.SetState(common.HexToAddress(common.RelayerRegistrationSMC), locHashDeposit, common.BigToHash(balance))
-		statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), fee)
+		statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), uint256.MustFromBig(fee))
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: SubRelayerFee AFTER", "relayer", relayer.String(), "balance", balance)
 		return nil
 	}
@@ -185,7 +185,7 @@ func AddTokenBalance(addr common.Address, value *big.Int, token common.Address, 
 	}
 }
 
-func SubTokenBalance(addr common.Address, value *big.Int, token common.Address, statedb *state.StateDB) error {
+func SubTokenBalance(addr common.Address, value *uint256.Int, token common.Address, statedb *state.StateDB) error {
 	// XDC native
 	if token == common.XDCNativeAddressBinary {
 		balance := statedb.GetBalance(addr)
@@ -205,10 +205,10 @@ func SubTokenBalance(addr common.Address, value *big.Int, token common.Address, 
 		locHash := common.BigToHash(GetLocMappingAtKey(addr.Hash(), slot))
 		balance := statedb.GetState(token, locHash).Big()
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: SUB TOKEN BALANCE BEFORE", "token", token.String(), "address", addr.String(), "balance", balance, "orderValue", value)
-		if balance.Cmp(value) < 0 {
+		if balance.Cmp(value.ToBig()) < 0 {
 			return errors.Errorf("value %s in token %s not enough , have : %s , want : %s  ", addr.String(), token.String(), balance, value)
 		}
-		balance = new(big.Int).Sub(balance, value)
+		balance = new(big.Int).Sub(balance, value.ToBig())
 		statedb.SetState(token, locHash, common.BigToHash(balance))
 		log.Debug("ApplyXDCXMatchedTransaction settle balance: SUB TOKEN BALANCE AFTER", "token", token.String(), "address", addr.String(), "balance", balance, "orderValue", value)
 		return nil
@@ -345,5 +345,5 @@ func SetSubRelayerFee(relayer common.Address, balance *big.Int, fee *big.Int, st
 	locBigDeposit := new(big.Int).SetUint64(uint64(0)).Add(locBig, RelayerStructMappingSlot["_deposit"])
 	locHashDeposit := common.BigToHash(locBigDeposit)
 	statedb.SetState(common.HexToAddress(common.RelayerRegistrationSMC), locHashDeposit, common.BigToHash(balance))
-	statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), fee)
+	statedb.SubBalance(common.HexToAddress(common.RelayerRegistrationSMC), uint256.MustFromBig(fee))
 }

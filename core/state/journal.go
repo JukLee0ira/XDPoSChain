@@ -17,8 +17,6 @@
 package state
 
 import (
-	"math/big"
-
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/holiman/uint256"
 )
@@ -45,7 +43,7 @@ type (
 	suicideChange struct {
 		account     *common.Address
 		prev        bool // whether account had already suicided
-		prevbalance *big.Int
+		prevbalance *uint256.Int
 	}
 
 	// Changes to individual accounts.
@@ -109,7 +107,7 @@ func (ch suicideChange) undo(s *StateDB) {
 	obj := s.getStateObject(*ch.account)
 	if obj != nil {
 		obj.suicided = ch.prev
-		obj.setBalance(uint256.MustFromBig(ch.prevbalance))
+		obj.setBalance(ch.prevbalance)
 	}
 }
 

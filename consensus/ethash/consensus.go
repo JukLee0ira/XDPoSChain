@@ -558,5 +558,5 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		r.Div(blockReward, u256_32)
 		reward.Add(reward, r)
 	}
-	state.AddBalance(header.Coinbase, (reward))
+	state.AddBalance(header.Coinbase, reward)
 }
