@@ -356,9 +356,6 @@ func (b *Block) BaseFee() *big.Int {
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 
-// Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles} }
-
 func (b *Block) HashNoNonce() common.Hash {
 	return b.header.HashNoNonce()
 }

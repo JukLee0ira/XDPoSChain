@@ -168,11 +168,9 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	if peer == nil {
 		return
 	}
-	// Make sure the peer's TD is higher than our own
-	currentBlock := pm.blockchain.CurrentBlock()
-	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
-	pHead, pTd := peer.Head()
-	if pTd.Cmp(td) <= 0 {
+	// Make sure the peer's TD is higher than our own. If not drop.
+	td := pm.blockchain.GetTd(pm.blockchain.CurrentBlock().Hash())
+	if peer.Td().Cmp(td) <= 0 {
 		return
 	}
 	// Otherwise try to sync with the downloader

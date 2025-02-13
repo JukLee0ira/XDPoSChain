@@ -30,6 +30,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/vm"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/params"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 // So we can deterministically seed different blockchains
@@ -311,32 +312,37 @@ func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.S
 // newCanonical creates a chain database, and injects a deterministic canonical
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
-func newCanonical(engine consensus.Engine, n int, full bool) (ethdb.Database, *BlockChain, error) {
-	// Initialize a fresh chain with only a genesis block
-	gspec := new(Genesis)
-	db := rawdb.NewMemoryDatabase()
-	genesis := gspec.MustCommit(db)
+func newCanonical(n int, full bool) (ethdb.Database, *BlockProcessor, error) {
+	// Create te new chain database
+	db, _ := ethdb.NewMemDatabase()
+	evmux := &event.TypeMux{}
 
-	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
+	// Initialize a fresh chain with only a genesis block
+	genesis, _ := WriteTestNetGenesisBlock(db, 0)
+
+	blockchain, _ := NewBlockChain(db, FakePow{}, evmux)
+	processor := NewBlockProcessor(db, FakePow{}, blockchain, evmux)
+	processor.bc.SetProcessor(processor)
+
 	// Create and inject the requested chain
 	if n == 0 {
-		return db, blockchain, nil
+		return db, processor, nil
 	}
 	if full {
 		// Full block-chain requested
-		blocks := makeBlockChain(genesis, n, engine, db, canonicalSeed)
+		blocks := makeBlockChain(genesis, n, db, canonicalSeed)
 		_, err := blockchain.InsertChain(blocks)
-		return db, blockchain, err
+		return db, processor, err
 	}
 	// Header-only chain requested
-	headers := makeHeaderChain(genesis.Header(), n, engine, db, canonicalSeed)
-	_, err := blockchain.InsertHeaderChain(headers, 1)
-	return db, blockchain, err
+	headers := makeHeaderChain(genesis.Header(), n, db, canonicalSeed)
+	_, err := blockchain.InsertHeaderChain(headers, true)
+	return db, processor, err
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(parent *types.Header, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Header {
-	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, engine, db, seed)
+func makeHeaderChain(parent *types.Header, n int, db ethdb.Database, seed int) []*types.Header {
+	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, db, seed)
 	headers := make([]*types.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.Header()
@@ -345,8 +351,8 @@ func makeHeaderChain(parent *types.Header, n int, engine consensus.Engine, db et
 }
 
 // makeBlockChain creates a deterministic chain of blocks rooted at parent.
-func makeBlockChain(parent *types.Block, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Block {
-	blocks, _ := GenerateChain(params.TestChainConfig, parent, engine, db, n, func(i int, b *BlockGen) {
+func makeBlockChain(parent *types.Block, n int, db ethdb.Database, seed int) []*types.Block {
+	return GenerateChain(parent, db, n, func(i int, b *BlockGen) {
 		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
 	})
 	return blocks

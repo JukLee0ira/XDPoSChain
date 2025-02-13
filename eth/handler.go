@@ -276,12 +276,12 @@ func (pm *ProtocolManager) removePeer(id string) {
 		log.Debug("Peer removal failed", "peer", id, "err", err)
 	}
 	// Hard disconnect at the networking layer
-	peer.Peer.Disconnect(p2p.DiscUselessPeer)
+	if peer != nil {
+		peer.Peer.Disconnect(p2p.DiscUselessPeer)
+	}
 }
 
-func (pm *ProtocolManager) Start(maxPeers int) {
-	pm.maxPeers = maxPeers
-
+func (pm *ProtocolManager) Start() {
 	// broadcast transactions
 	pm.txsCh = make(chan core.NewTxsEvent, txChanSize)
 	pm.txsSub = pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
@@ -670,38 +670,40 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			} else if err != nil {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
-			// Retrieve the requested block's receipts, skipping if unknown to us
-			results := pm.blockchain.GetReceiptsByHash(hash)
-			if results == nil {
-				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
-					continue
-				}
-			}
-			// If known, encode and queue for response packet
-			if encoded, err := rlp.EncodeToBytes(results); err != nil {
-				log.Error("Failed to encode receipt", "err", err)
-			} else {
-				receipts = append(receipts, encoded)
-				bytes += len(encoded)
+			// Retrieve the requested receipt, stopping if enough was found
+			if receipt := core.GetReceipt(pm.chaindb, hash); receipt != nil {
+				receipts = append(receipts, receipt)
+				bytes += len(receipt.RlpEncode())
 			}
 		}
-		return p.SendReceiptsRLP(receipts)
-
-	case p.version >= eth63 && msg.Code == ReceiptsMsg:
-		// A batch of receipts arrived to one of our previous requests
-		var receipts [][]*types.Receipt
-		if err := msg.Decode(&receipts); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		// Deliver all to the downloader
-		if err := pm.downloader.DeliverReceipts(p.id, receipts); err != nil {
-			log.Debug("Failed to deliver receipts", "err", err)
-		}
+		return p.SendReceipts(receipts)
 
 	case msg.Code == NewBlockHashesMsg:
-		var announces newBlockHashesData
-		if err := msg.Decode(&announces); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
+		// Retrieve and deseralize the remote new block hashes notification
+		type announce struct {
+			Hash   common.Hash
+			Number uint64
+		}
+		var announces = []announce{}
+
+		if p.version < eth62 {
+			// We're running the old protocol, make block number unknown (0)
+			var hashes []common.Hash
+			if err := msg.Decode(&hashes); err != nil {
+				return errResp(ErrDecode, "%v: %v", msg, err)
+			}
+			for _, hash := range hashes {
+				announces = append(announces, announce{hash, 0})
+			}
+		} else {
+			// Otherwise extract both block hash and number
+			var request newBlockHashesData
+			if err := msg.Decode(&request); err != nil {
+				return errResp(ErrDecode, "%v: %v", msg, err)
+			}
+			for _, block := range request {
+				announces = append(announces, announce{block.Hash, block.Number})
+			}
 		}
 		// Mark the hashes as present at the remote node
 		for _, block := range announces {
@@ -725,27 +727,16 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
 		request.Block.ReceivedAt = msg.ReceivedAt
-		request.Block.ReceivedFrom = p
 
 		// Mark the peer as owning the block and schedule it for import
 		p.MarkBlock(request.Block.Hash())
 		pm.fetcher.Enqueue(p.id, request.Block)
 
-		// Assuming the block is importable by the peer, but possibly not yet done so,
-		// calculate the head hash and TD that the peer truly must have.
-		var (
-			trueHead = request.Block.ParentHash()
-			trueTD   = new(big.Int).Sub(request.TD, request.Block.Difficulty())
-		)
-		// Update the peers total difficulty if better than the previous
-		if _, td := p.Head(); trueTD.Cmp(td) > 0 {
-			p.SetHead(trueHead, trueTD)
-
-			// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
-			// a singe block (as the true TD is below the propagated block), however this
-			// scenario should easily be covered by the fetcher.
-			currentBlock := pm.blockchain.CurrentBlock()
-			if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
+		// Update the peers total difficulty if needed, schedule a download if gapped
+		if request.TD.Cmp(p.Td()) > 0 {
+			p.SetTd(request.TD)
+			td := pm.blockchain.GetTd(pm.blockchain.CurrentBlock().Hash())
+			if request.TD.Cmp(new(big.Int).Add(td, request.Block.Difficulty())) > 0 {
 				go pm.synchronise(p)
 			}
 		}
@@ -767,123 +758,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				return errResp(ErrDecode, "transaction %d is nil", i)
 			}
 			p.MarkTransaction(tx.Hash())
-			if pm.knownTxs.Contains(tx.Hash()) {
-				log.Trace("Discard known tx", "hash", tx.Hash(), "nonce", tx.Nonce(), "to", tx.To())
-			} else {
-				pm.knownTxs.Add(tx.Hash(), struct{}{})
-			}
-
 		}
-		pm.txpool.AddRemotes(txs)
-
-	case msg.Code == OrderTxMsg:
-		// Transactions arrived, make sure we have a valid and fresh chain to handle them
-		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
-			break
-		}
-		// Transactions can be processed, parse all of them and deliver to the pool
-		var txs []*types.OrderTransaction
-		if err := msg.Decode(&txs); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-
-		for i, tx := range txs {
-			// Validate and mark the remote transaction
-			if tx == nil {
-				return errResp(ErrDecode, "transaction %d is nil", i)
-			}
-			p.MarkOrderTransaction(tx.Hash())
-			if pm.knowOrderTxs.Contains(tx.Hash()) {
-				log.Trace("Discard known tx", "hash", tx.Hash(), "nonce", tx.Nonce())
-			} else {
-				pm.knowOrderTxs.Add(tx.Hash(), struct{}{})
-			}
-		}
-
-		if pm.orderpool != nil {
-			pm.orderpool.AddRemotes(txs)
-		}
-
-	case msg.Code == LendingTxMsg:
-		// Transactions arrived, make sure we have a valid and fresh chain to handle them
-		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
-			break
-		}
-		// Transactions can be processed, parse all of them and deliver to the pool
-		var txs []*types.LendingTransaction
-		if err := msg.Decode(&txs); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-
-		for i, tx := range txs {
-			// Validate and mark the remote transaction
-			if tx == nil {
-				return errResp(ErrDecode, "transaction %d is nil", i)
-			}
-			p.MarkLendingTransaction(tx.Hash())
-			if pm.knowLendingTxs.Contains(tx.Hash()) {
-				log.Trace("Discard known tx", "hash", tx.Hash(), "nonce", tx.Nonce())
-			} else {
-				pm.knowLendingTxs.Add(tx.Hash(), struct{}{})
-			}
-		}
-
-		if pm.lendingpool != nil {
-			pm.lendingpool.AddRemotes(txs)
-		}
-	case msg.Code == VoteMsg:
-		if pm.downloader.Synchronising() {
-			break
-		}
-
-		var vote types.Vote
-		if err := msg.Decode(&vote); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		p.MarkVote(vote.Hash())
-
-		if pm.knownVotes.Contains(vote.Hash()) {
-			log.Trace("Discarded vote, known vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round)
-		} else {
-			pm.knownVotes.Add(vote.Hash(), struct{}{})
-			go pm.bft.Vote(p.id, &vote)
-		}
-
-	case msg.Code == TimeoutMsg:
-		if pm.downloader.Synchronising() {
-			break
-		}
-
-		var timeout types.Timeout
-		if err := msg.Decode(&timeout); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		p.MarkTimeout(timeout.Hash())
-
-		if pm.knownTimeouts.Contains(timeout.Hash()) {
-			log.Trace("Discarded Timeout, known Timeout", "Signature", timeout.Signature, "hash", timeout.Hash(), "round", timeout.Round)
-		} else {
-			pm.knownTimeouts.Add(timeout.Hash(), struct{}{})
-			go pm.bft.Timeout(p.id, &timeout)
-		}
-
-	case msg.Code == SyncInfoMsg:
-		if pm.downloader.Synchronising() {
-			break
-		}
-
-		var syncInfo types.SyncInfo
-		if err := msg.Decode(&syncInfo); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		p.MarkSyncInfo(syncInfo.Hash())
-
-		if pm.knownSyncInfos.Contains(syncInfo.Hash()) {
-			log.Trace("Discarded SyncInfo, known SyncInfo", "hash", syncInfo.Hash())
-		} else {
-			pm.knownSyncInfos.Add(syncInfo.Hash(), struct{}{})
-			go pm.bft.SyncInfo(p.id, &syncInfo)
-		}
+		pm.txpool.AddTransactions(txs)
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
@@ -917,105 +793,26 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	// Otherwise if the block is indeed in out own chain, announce it
 	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
 		for _, peer := range peers {
-			peer.SendNewBlockHashes([]common.Hash{hash}, []uint64{block.NumberU64()})
+			if peer.version < eth62 {
+				peer.SendNewBlockHashes61([]common.Hash{hash})
+			} else {
+				peer.SendNewBlockHashes([]common.Hash{hash}, []uint64{block.NumberU64()})
+			}
 		}
-		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		glog.V(logger.Detail).Infof("announced block %x to %d peers in %v", hash[:4], len(peers), time.Since(block.ReceivedAt))
 	}
 }
 
-// BroadcastTxs will propagate a batch of transactions to all peers which are not known to
+// BroadcastTx will propagate a transaction to all peers which are not known to
 // already have the given transaction.
-func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
-	var txset = make(map[*peer]types.Transactions)
-
-	// Broadcast transactions to a batch of peers not knowing about it
-	for _, tx := range txs {
-		peers := pm.peers.PeersWithoutTx(tx.Hash())
-		for _, peer := range peers {
-			txset[peer] = append(txset[peer], tx)
-		}
-		log.Trace("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
-	}
-	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for peer, txs := range txset {
-		peer.SendTransactions(txs)
-	}
-}
-
-// BroadcastVote will propagate a Vote to all peers which are not known to
-// already have the given vote.
-func (pm *ProtocolManager) BroadcastVote(vote *types.Vote) {
-	hash := vote.Hash()
-	peers := pm.peers.PeersWithoutVote(hash)
-	if len(peers) > 0 {
-		for _, peer := range peers {
-			err := peer.SendVote(vote)
-			if err != nil {
-				log.Debug("[BroadcastVote] Fail to broadcast vote message", "peerId", peer.id, "version", peer.version, "blockNum", vote.ProposedBlockInfo.Number, "err", err)
-				pm.removePeer(peer.id)
-			}
-		}
-		log.Trace("Propagated Vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "recipients", len(peers))
-	}
-}
-
-// BroadcastTimeout will propagate a Timeout to all peers which are not known to
-// already have the given timeout.
-func (pm *ProtocolManager) BroadcastTimeout(timeout *types.Timeout) {
-	hash := timeout.Hash()
-	peers := pm.peers.PeersWithoutTimeout(hash)
-	if len(peers) > 0 {
-		for _, peer := range peers {
-			err := peer.SendTimeout(timeout)
-			if err != nil {
-				log.Debug("[BroadcastTimeout] Fail to broadcast timeout message, remove peer", "peerId", peer.id, "version", peer.version, "timeout", timeout, "err", err)
-				pm.removePeer(peer.id)
-			}
-		}
-		log.Trace("Propagated Timeout", "hash", hash, "recipients", len(peers))
-	}
-}
-
-// BroadcastSyncInfo will propagate a SyncInfo to all peers which are not known to
-// already have the given SyncInfo.
-func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo *types.SyncInfo) {
-	hash := syncInfo.Hash()
-	peers := pm.peers.PeersWithoutSyncInfo(hash)
-	if len(peers) > 0 {
-		for _, peer := range peers {
-			err := peer.SendSyncInfo(syncInfo)
-			if err != nil {
-				log.Debug("[BroadcastSyncInfo] Fail to broadcast syncInfo message, remove peer", "peerId", peer.id, "version", peer.version, "syncInfo", syncInfo, "err", err)
-				pm.removePeer(peer.id)
-			}
-		}
-		log.Trace("Propagated SyncInfo", "hash", hash, "recipients", len(peers))
-	}
-
-}
-
-// OrderBroadcastTx will propagate a transaction to all peers which are not known to
-// already have the given transaction.
-func (pm *ProtocolManager) OrderBroadcastTx(hash common.Hash, tx *types.OrderTransaction) {
+func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) {
 	// Broadcast transaction to a batch of peers not knowing about it
-	peers := pm.peers.OrderPeersWithoutTx(hash)
+	peers := pm.peers.PeersWithoutTx(hash)
 	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for _, peer := range peers {
-		peer.SendOrderTransactions(types.OrderTransactions{tx})
+		peer.SendTransactions(types.Transactions{tx})
 	}
-	log.Trace("Broadcast order transaction", "hash", hash, "recipients", len(peers))
-}
-
-// LendingBroadcastTx will propagate a transaction to all peers which are not known to
-// already have the given transaction.
-func (pm *ProtocolManager) LendingBroadcastTx(hash common.Hash, tx *types.LendingTransaction) {
-	// Broadcast transaction to a batch of peers not knowing about it
-	peers := pm.peers.LendingPeersWithoutTx(hash)
-	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for _, peer := range peers {
-		peer.SendLendingTransactions(types.LendingTransactions{tx})
-	}
-	log.Trace("Broadcast lending transaction", "hash", hash, "recipients", len(peers))
+	glog.V(logger.Detail).Infoln("broadcast tx to", len(peers), "peers")
 }
 
 // minedBroadcastLoop broadcast loop
