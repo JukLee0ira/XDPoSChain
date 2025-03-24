@@ -35,6 +35,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/cmd/utils"
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/eth/ethconfig"
+	"github.com/XinFinOrg/XDPoSChain/internal/ethapi"
 	"github.com/XinFinOrg/XDPoSChain/internal/flags"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/metrics"
@@ -229,7 +230,7 @@ func applyValues(values []string, params *[]string) {
 
 }
 
-func makeFullNode(ctx *cli.Context) (*node.Node, XDCConfig) {
+func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend, XDCConfig) {
 	stack, cfg := makeConfigNode(ctx)
 
 	// Start metrics export if enabled
@@ -238,14 +239,15 @@ func makeFullNode(ctx *cli.Context) (*node.Node, XDCConfig) {
 	// Register XDCX's OrderBook service if requested.
 	// enable in default
 	utils.RegisterXDCXService(stack, &cfg.XDCX)
-	utils.RegisterEthService(stack, &cfg.Eth, cfg.Node.Version)
+	// utils.RegisterEthService(stack, &cfg.Eth, cfg.Node.Version)
+	backend := utils.RegisterEthService(stack, &cfg.Eth, cfg.Node.Version)
 
 	// Add the Ethereum Stats daemon if requested.
 	if cfg.Ethstats.URL != "" {
-		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
+		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
 	}
 
-	return stack, cfg
+	return stack, backend, cfg
 }
 
 // dumpConfig is the dumpconfig command.

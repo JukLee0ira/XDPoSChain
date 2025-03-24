@@ -50,7 +50,7 @@ func (l *Lending) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
 }
 
-func (l *Lending) Start(server *p2p.Server) error {
+func (l *Lending) Start() error {
 	return nil
 }
 

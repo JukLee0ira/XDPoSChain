@@ -93,6 +93,7 @@ type Backend interface {
 	SendLendingTx(ctx context.Context, signedTx *types.LendingTransaction) error
 
 	ChainConfig() *params.ChainConfig
+	Engine() consensus.Engine
 	CurrentBlock() *types.Block
 	GetIPCClient() (bind.ContractBackend, error)
 	GetEngine() consensus.Engine

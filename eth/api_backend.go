@@ -46,6 +46,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/event"
 	"github.com/XinFinOrg/XDPoSChain/log"
+	"github.com/XinFinOrg/XDPoSChain/miner"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
 )
@@ -335,6 +336,10 @@ func (b *EthApiBackend) OrderStats() (pending int, queued int) {
 	return b.eth.txPool.Stats()
 }
 
+// func (b *EthApiBackend) TxPool() *core.TxPool {
+// 	return b.eth.TxPool()
+// }//TODO:remove this function
+
 func (b *EthApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.eth.TxPool().SubscribeNewTxsEvent(ch)
 }
@@ -390,6 +395,14 @@ func (b *EthApiBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 	}
 }
 
+func (b *EthApiBackend) Engine() consensus.Engine {
+	return b.eth.engine
+}
+
+func (b *EthApiBackend) Miner() *miner.Miner {
+	return b.eth.Miner()
+}
+
 func (b *EthApiBackend) GetIPCClient() (bind.ContractBackend, error) {
 	// func (b *EthApiBackend) GetIPCClient() (*ethclient.Client, error) {
 	client, err := b.eth.blockchain.GetClient()
@@ -400,7 +413,7 @@ func (b *EthApiBackend) GetIPCClient() (bind.ContractBackend, error) {
 	return client, nil
 }
 
-func (b *EthApiBackend) GetEngine() consensus.Engine {
+func (b *EthApiBackend) GetEngine() consensus.Engine { //TODO:rename to Engine
 	return b.eth.engine
 }
 
