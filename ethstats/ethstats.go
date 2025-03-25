@@ -76,6 +76,7 @@ type backend interface {
 	Stats() (pending int, queued int)
 	Downloader() *downloader.Downloader
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
+	GetPeer() int
 }
 
 // fullNodeBackend encompasses the functionality necessary for a full node
@@ -799,7 +800,7 @@ func (s *Service) reportStats(conn *connWrapper) error {
 			Active:   true,
 			Mining:   mining,
 			Hashrate: hashrate,
-			Peers:    s.eth.GetPeer(),
+			Peers:    fullBackend.GetPeer(),
 			GasPrice: gasprice,
 			Syncing:  syncing,
 			Uptime:   100,

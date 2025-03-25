@@ -117,6 +117,7 @@ type Backend interface {
 	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
+	GetPeer() int
 }
 
 func GetAPIs(apiBackend Backend, chainReader consensus.ChainReader) []rpc.API {

@@ -628,3 +628,7 @@ func (b *EthApiBackend) XDCxService() *XDCx.XDCX {
 func (b *EthApiBackend) LendingService() *XDCxlending.Lending {
 	return b.eth.Lending
 }
+
+func (b *EthApiBackend) GetPeer() int {
+	return b.eth.protocolManager.peers.Len()
+}
