@@ -75,6 +75,7 @@ type backend interface {
 	GetTd(ctx context.Context, hash common.Hash) *big.Int
 	Stats() (pending int, queued int)
 	Downloader() *downloader.Downloader
+	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
 }
 
 // fullNodeBackend encompasses the functionality necessary for a full node
@@ -783,7 +784,7 @@ func (s *Service) reportStats(conn *connWrapper) error {
 		sync := fullBackend.Downloader().Progress()
 		syncing = fullBackend.CurrentHeader().Number.Uint64() >= sync.HighestBlock
 
-		price, _ := s.eth.ApiBackend.SuggestGasTipCap(context.Background())
+		price, _ := s.backend.SuggestGasTipCap(context.Background())
 		gasprice = int(price.Uint64())
 		if basefee := fullBackend.CurrentHeader().BaseFee; basefee != nil {
 			gasprice += int(basefee.Uint64())
