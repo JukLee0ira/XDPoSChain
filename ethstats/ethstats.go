@@ -72,7 +72,7 @@ type backend interface {
 	SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription
 	CurrentHeader() *types.Header
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
-	GetTd(ctx context.Context, hash common.Hash) *big.Int
+	GetTd(hash common.Hash) *big.Int
 	Stats() (pending int, queued int)
 	Downloader() *downloader.Downloader
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
