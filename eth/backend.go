@@ -236,7 +236,7 @@ func New(stack *node.Node, config *ethconfig.Config, XDCXServ *XDCx.XDCX, lendin
 	if eth.protocolManager, err = NewProtocolManagerEx(eth.chainConfig, config.SyncMode, networkID, eth.eventMux, eth.txPool, eth.orderPool, eth.lendingPool, eth.engine, eth.blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, ctx.GetConfig().AnnounceTxs)
+	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, stack.Config().AnnounceTxs)
 	eth.miner.SetExtra(makeExtraData(config.ExtraData))
 
 	if eth.chainConfig.XDPoS != nil {
@@ -247,7 +247,7 @@ func New(stack *node.Node, config *ethconfig.Config, XDCXServ *XDCx.XDCX, lendin
 	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, config.GPO, config.GasPrice)
 
 	// Set global ipc endpoint.
-	eth.blockchain.IPCEndpoint = ctx.GetConfig().IPCEndpoint()
+	eth.blockchain.IPCEndpoint = stack.IPCEndpoint()
 
 	if eth.chainConfig.XDPoS != nil {
 		c := eth.engine.(*XDPoS.XDPoS)
