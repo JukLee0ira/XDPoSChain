@@ -122,7 +122,7 @@ func Test_getCancelFee(t *testing.T) {
 	// set tokenBPrice = 1 XDC
 	tradingStateDb.SetMediumPriceBeforeEpoch(tradingstate.GetTradingOrderBookHash(testTokenB, common.XDCNativeAddressBinary), common.BasePrice)
 
-	l := New(XDCx)
+	l, _ := New(stack, XDCx)
 
 	type CancelFeeArg struct {
 		borrowFeeRate *big.Int

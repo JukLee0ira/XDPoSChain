@@ -133,7 +133,7 @@ func NewXDCSimulatedBackend(alloc types.GenesisAlloc, gasLimit uint64, chainConf
 		return nil
 	}
 	// defer stack.Close()
-	lendingServ := XDCxlending.New(XDCXServ)
+	lendingServ, err := XDCxlending.New(stack, XDCXServ)
 
 	consensus.GetXDCXService = func() utils.TradingService {
 		return XDCXServ
