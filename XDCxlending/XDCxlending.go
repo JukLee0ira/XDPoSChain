@@ -70,9 +70,9 @@ func New(stack *node.Node, XDCx *XDCx.XDCX) (*Lending, error) {
 	lending.XDCx = XDCx
 
 	// Register the backend on the node
-	stack.RegisterAPIs(lending.XDCx.APIs())
-	stack.RegisterProtocols(lending.XDCx.Protocols())
-	stack.RegisterLifecycle(lending.XDCx)
+	stack.RegisterAPIs(lending.APIs())
+	stack.RegisterProtocols(lending.Protocols())
+	stack.RegisterLifecycle(lending)
 
 	return lending, nil
 }
