@@ -325,17 +325,20 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, cfg X
 	}()
 	// Start auxiliary services if enabled
 
-	var ethereum *eth.Ethereum
+	ethBackend, ok := backend.(*eth.EthApiBackend)
+	if !ok {
+		utils.Fatalf("Ethereum service not running")
+	}
 	// if err := stack.Service(&ethereum); err != nil {
 	// 	utils.Fatalf("Ethereum service not running: %v", err)
 	// }//TODO:remove this,refer :https://github.com/ethereum/go-ethereum/pull/21105/files?diff=split&w=0#diff-30437b401e56caf63af6a19560e47ff5c65bfe20970c044d5c497f2158729b3cL388
-	if engine, ok := ethereum.Engine().(*XDPoS.XDPoS); ok {
+	if engine, ok := ethBackend.Engine().(*XDPoS.XDPoS); ok {
 		go func() {
 			started := false
 			ok := false
 			slaveMode := ctx.IsSet(utils.XDCSlaveModeFlag.Name)
 			var err error
-			ok, err = ethereum.ValidateMasternode()
+			ok, err = ethBackend.ValidateMasternode()
 			if err != nil {
 				utils.Fatalf("Can't verify masternode permission: %v", err)
 			}
@@ -350,13 +353,13 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, cfg X
 						type threaded interface {
 							SetThreads(threads int)
 						}
-						if th, ok := ethereum.Engine().(threaded); ok {
+						if th, ok := ethBackend.Engine().(threaded); ok {
 							th.SetThreads(threads)
 						}
 					}
 					// Set the gas price to the limits from the CLI and start mining
-					ethereum.TxPool().SetGasPrice(cfg.Eth.GasPrice)
-					if err := ethereum.StartStaking(true); err != nil {
+					ethBackend.TxPool().SetGasPrice(cfg.Eth.GasPrice)
+					if err := ethBackend.StartStaking(true); err != nil {
 						utils.Fatalf("Failed to start staking: %v", err)
 					}
 					started = true
@@ -367,17 +370,17 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, cfg X
 			for range core.CheckpointCh {
 				log.Info("Checkpoint!!! It's time to reconcile node's state...")
 				log.Info("Update consensus parameters")
-				chain := ethereum.BlockChain()
+				chain := ethBackend.BlockChain()
 				engine.UpdateParams(chain.CurrentHeader())
 
-				ok, err = ethereum.ValidateMasternode()
+				ok, err = ethBackend.ValidateMasternode()
 				if err != nil {
 					utils.Fatalf("Can't verify masternode permission: %v", err)
 				}
 				if !ok {
 					if started {
 						log.Info("Only masternode can propose and verify blocks. Cancelling staking on this node...")
-						ethereum.StopStaking()
+						ethBackend.StopStaking()
 						started = false
 						log.Info("Cancelled mining mode!!!")
 					}
@@ -392,13 +395,13 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, cfg X
 							type threaded interface {
 								SetThreads(threads int)
 							}
-							if th, ok := ethereum.Engine().(threaded); ok {
+							if th, ok := ethBackend.Engine().(threaded); ok {
 								th.SetThreads(threads)
 							}
 						}
 						// Set the gas price to the limits from the CLI and start mining
-						ethereum.TxPool().SetGasPrice(cfg.Eth.GasPrice)
-						if err := ethereum.StartStaking(true); err != nil {
+						ethBackend.TxPool().SetGasPrice(cfg.Eth.GasPrice)
+						if err := ethBackend.StartStaking(true); err != nil {
 							utils.Fatalf("Failed to start staking: %v", err)
 						}
 						started = true

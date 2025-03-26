@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -175,6 +176,7 @@ func (c *Client) GetNodes() ([]*p2p.NodeInfo, error) {
 // CreateNode creates a node in the network using the given configuration
 func (c *Client) CreateNode(config *adapters.NodeConfig) (*p2p.NodeInfo, error) {
 	node := &p2p.NodeInfo{}
+	log.Println("Creating node with config:", config)
 	return node, c.Post("/nodes", config, node)
 }
 
@@ -244,6 +246,7 @@ func (c *Client) Send(method, path string, in, out interface{}) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	log.Println("Sending request:", req)
 	res, err := c.client.Do(req)
 	if err != nil {
 		return err

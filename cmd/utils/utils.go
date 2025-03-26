@@ -23,8 +23,8 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config, version string)
 		return nil
 	} else {
 		// err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var XDCXServ *XDCx.XDCX
-		var lendingServ *XDCxlending.Lending
+		// var XDCXServ *XDCx.XDCX
+		// var lendingServ *XDCxlending.Lending
 
 		// ctx.Service(&XDCXServ)
 		XDCXServ, err := XDCx.New(stack, &XDCx.Config{})
@@ -32,7 +32,7 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config, version string)
 			Fatalf("Failed to initialize XDCX service: %v", err)
 		}
 		// ctx.Service(&lendingServ)
-		lendingServ, err = XDCxlending.New(stack, XDCXServ)
+		lendingServ, err := XDCxlending.New(stack, XDCXServ)
 		if err != nil {
 			Fatalf("Failed to initialize lending service: %v", err)
 		}

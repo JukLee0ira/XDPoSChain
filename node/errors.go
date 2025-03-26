@@ -25,7 +25,7 @@ import (
 
 var (
 	ErrDatadirUsed    = errors.New("datadir already used by another process")
-	ErrNodeStopped    = errors.New("node not started")
+	ErrNodeStopped    = errors.New("node2 not started") //TODO:rm this
 	ErrNodeRunning    = errors.New("node already running")
 	ErrServiceUnknown = errors.New("unknown service")
 

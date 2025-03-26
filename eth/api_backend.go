@@ -38,6 +38,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/bloombits"
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"github.com/XinFinOrg/XDPoSChain/core/state"
+	"github.com/XinFinOrg/XDPoSChain/core/txpool"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/core/vm"
 	"github.com/XinFinOrg/XDPoSChain/eth/downloader"
@@ -631,4 +632,29 @@ func (b *EthApiBackend) LendingService() *XDCxlending.Lending {
 
 func (b *EthApiBackend) GetPeer() int {
 	return b.eth.protocolManager.peers.Len()
+}
+
+// ValidateMasternode checks if node's address is in set of masternodes
+func (b *EthApiBackend) ValidateMasternode() (bool, error) {
+	return b.eth.ValidateMasternode()
+}
+
+func (b *EthApiBackend) StartStaking(local bool) error {
+	return b.eth.StartStaking(local)
+}
+
+func (b *EthApiBackend) StopStaking() {
+	b.eth.StopStaking()
+}
+
+func (b *EthApiBackend) IsStaking() bool {
+	return b.eth.IsStaking()
+}
+
+func (b *EthApiBackend) BlockChain() *core.BlockChain {
+	return b.eth.blockchain
+}
+
+func (b *EthApiBackend) TxPool() *txpool.TxPool {
+	return b.eth.txPool
 }
