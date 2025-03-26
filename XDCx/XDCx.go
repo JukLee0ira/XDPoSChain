@@ -16,7 +16,6 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/state"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/log"
-	"github.com/XinFinOrg/XDPoSChain/node"
 	"github.com/XinFinOrg/XDPoSChain/p2p"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
 	"golang.org/x/sync/syncmap"
@@ -93,7 +92,7 @@ func NewMongoDBEngine(cfg *Config) *XDCxDAO.MongoDatabase {
 }
 
 // func New(stack *node.Node, cfg *Config) (*Whisper, error) {
-func New(stack *node.Node, cfg *Config) (*XDCX, error) {
+func New(cfg *Config) (*XDCX, error) {
 	XDCX := &XDCX{
 		orderNonce:        make(map[common.Address]*big.Int),
 		Triegc:            prque.New[int64, common.Hash](nil),
@@ -113,9 +112,9 @@ func New(stack *node.Node, cfg *Config) (*XDCX, error) {
 	XDCX.StateCache = tradingstate.NewDatabase(XDCX.db)
 	XDCX.settings.Store(overflowIdx, false)
 
-	stack.RegisterAPIs(XDCX.APIs())
-	stack.RegisterProtocols(XDCX.Protocols())
-	stack.RegisterLifecycle(XDCX)
+	// stack.RegisterAPIs(XDCX.APIs())
+	// stack.RegisterProtocols(XDCX.Protocols())
+	// stack.RegisterLifecycle(XDCX)
 	return XDCX, nil
 }
 
