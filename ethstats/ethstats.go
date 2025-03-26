@@ -75,6 +75,7 @@ type backend interface {
 	GetTd(hash common.Hash) *big.Int
 	Stats() (pending int, queued int)
 	Downloader() *downloader.Downloader
+	Engine() consensus.Engine
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
 	GetPeer() int
 }
@@ -202,7 +203,11 @@ func (s *Service) loop() {
 
 	// Forensics events
 	forensicsEventCh := make(chan types.ForensicsEvent)
-	if engine != nil {
+	// var engine consensusEngine
+	// engine = s.backendEngine().(*XDPoS.XDPoS)
+	// TODO: check if engine have been set
+	// if engine != nil {
+	if engine, ok := s.engine.(consensusEngine); ok {
 		forensicsSub := engine.SubscribeForensicsEvent(forensicsEventCh)
 		defer forensicsSub.Unsubscribe()
 	}
