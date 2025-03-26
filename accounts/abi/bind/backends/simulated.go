@@ -30,6 +30,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/XDCx"
 	"github.com/XinFinOrg/XDPoSChain/XDCxlending"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
+
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi"
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi/bind"
 	"github.com/XinFinOrg/XDPoSChain/accounts/keystore"
@@ -49,6 +50,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/eth/filters"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/event"
+	"github.com/XinFinOrg/XDPoSChain/node"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
 )
@@ -117,7 +119,18 @@ func NewXDCSimulatedBackend(alloc types.GenesisAlloc, gasLimit uint64, chainConf
 	var DefaultConfig = XDCx.Config{
 		DataDir: "",
 	}
-	XDCXServ := XDCx.New(&DefaultConfig)
+	// XDCXServ := XDCx.New(&DefaultConfig)//TODO:remove this
+	stack, err := node.New(&node.DefaultConfig)
+	if err != nil {
+		fmt.Errorf("could not create new node: %v", err)
+		return nil
+	}
+	XDCXServ, err := XDCx.New(stack, &DefaultConfig)
+	if err != nil {
+		fmt.Errorf("could not create new XDCx service: %v", err)
+		return nil
+	}
+	defer stack.Close()
 	lendingServ := XDCxlending.New(XDCXServ)
 
 	consensus.GetXDCXService = func() utils.TradingService {

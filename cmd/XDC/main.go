@@ -34,6 +34,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/eth"
 	"github.com/XinFinOrg/XDPoSChain/ethclient"
 	"github.com/XinFinOrg/XDPoSChain/internal/debug"
+	"github.com/XinFinOrg/XDPoSChain/internal/ethapi"
 	"github.com/XinFinOrg/XDPoSChain/internal/flags"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/metrics"
@@ -249,17 +250,17 @@ func main() {
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func XDC(ctx *cli.Context) error {
-	node, cfg := makeFullNode(ctx)
-	defer node.Close()
-	startNode(ctx, node, cfg)
-	node.Wait()
+	stack, backend, cfg := makeFullNode(ctx)
+	defer stack.Close()
+	startNode(ctx, stack, backend, cfg)
+	stack.Wait()
 	return nil
 }
 
 // startNode boots up the system node and all registered protocols, after which
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
 // miner.
-func startNode(ctx *cli.Context, stack *node.Node, cfg XDCConfig) {
+func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, cfg XDCConfig) {
 	// Start up the node itself
 	utils.StartNode(stack)
 
@@ -325,9 +326,9 @@ func startNode(ctx *cli.Context, stack *node.Node, cfg XDCConfig) {
 	// Start auxiliary services if enabled
 
 	var ethereum *eth.Ethereum
-	if err := stack.Service(&ethereum); err != nil {
-		utils.Fatalf("Ethereum service not running: %v", err)
-	}
+	// if err := stack.Service(&ethereum); err != nil {
+	// 	utils.Fatalf("Ethereum service not running: %v", err)
+	// }//TODO:remove this,refer :https://github.com/ethereum/go-ethereum/pull/21105/files?diff=split&w=0#diff-30437b401e56caf63af6a19560e47ff5c65bfe20970c044d5c497f2158729b3cL388
 	if engine, ok := ethereum.Engine().(*XDPoS.XDPoS); ok {
 		go func() {
 			started := false

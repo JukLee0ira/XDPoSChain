@@ -11,6 +11,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
+	"github.com/XinFinOrg/XDPoSChain/node"
 )
 
 func Test_getCancelFeeV1(t *testing.T) {
@@ -95,7 +96,15 @@ func Test_getCancelFeeV1(t *testing.T) {
 }
 
 func Test_getCancelFee(t *testing.T) {
-	XDCx := XDCx.New(&XDCx.DefaultConfig)
+	stack, err := node.New(&node.DefaultConfig)
+	if err != nil {
+		t.Fatalf("could not create new node: %v", err)
+	}
+	XDCx, err := XDCx.New(stack, &XDCx.DefaultConfig)
+	if err != nil {
+		t.Fatalf("could not create new XDCx service: %v", err)
+	}
+	defer stack.Close()
 	db := rawdb.NewMemoryDatabase()
 	stateCache := tradingstate.NewDatabase(db)
 	tradingStateDb, _ := tradingstate.New(types.EmptyRootHash, stateCache)

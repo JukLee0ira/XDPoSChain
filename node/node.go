@@ -540,6 +540,12 @@ func (n *Node) WSEndpoint() string {
 	return "ws://" + n.ws.listenAddr()
 }
 
+// EventMux retrieves the event multiplexer used by all the network services in
+// the current protocol stack.
+func (n *Node) EventMux() *event.TypeMux {
+	return n.eventmux
+}
+
 // OpenDatabase opens an existing database with the given name (or creates one if no
 // previous can be found) from within the node's instance directory. If the node is
 // ephemeral, a memory database is returned.
@@ -555,7 +561,7 @@ func (n *Node) OpenDatabase(name string, cache, handles int, namespace string, r
 	if n.config.DataDir == "" {
 		db = rawdb.NewMemoryDatabase()
 	} else {
-		db, err = rawdb.NewLevelDBDatabase(n.ResolvePath(name), cache, handles, namespace)
+		db, err = rawdb.NewLevelDBDatabase(n.ResolvePath(name), cache, handles, namespace, readonly)
 	}
 
 	if err == nil {
