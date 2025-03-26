@@ -24,14 +24,23 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config, version string)
 	} else {
 		// err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var XDCXServ *XDCx.XDCX
-		//ctx.Service(&XDCXServ)
 		var lendingServ *XDCxlending.Lending
-		//ctx.Service(&lendingServ)
+
+		// ctx.Service(&XDCXServ)
+		XDCXServ, err := XDCx.New(stack, &XDCx.Config{})
+		if err != nil {
+			Fatalf("Failed to initialize XDCX service: %v", err)
+		}
+		// ctx.Service(&lendingServ)
+		lendingServ, err = XDCxlending.New(stack, XDCXServ)
+		if err != nil {
+			Fatalf("Failed to initialize lending service: %v", err)
+		}
+		backend, err := eth.New(stack, cfg, XDCXServ, lendingServ)
 		// 	fullNode, err := eth.New(ctx, cfg, XDCXServ, lendingServ)
 		// 	if err != nil {
 		// 		return nil, err
 		// 	}
-		backend, err := eth.New(stack, cfg, XDCXServ, lendingServ)
 		if err != nil {
 			Fatalf("Failed to register the Ethereum service: %v", err)
 		}
