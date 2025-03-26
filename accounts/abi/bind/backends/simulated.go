@@ -30,6 +30,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/XDCx"
 	"github.com/XinFinOrg/XDPoSChain/XDCxlending"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
+	"github.com/XinFinOrg/XDPoSChain/node"
 
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi"
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi/bind"
@@ -119,13 +120,14 @@ func NewXDCSimulatedBackend(alloc types.GenesisAlloc, gasLimit uint64, chainConf
 	var DefaultConfig = XDCx.Config{
 		DataDir: "",
 	}
-	XDCXServ, err := XDCx.New(&DefaultConfig) //TODO:remove this
-	// stack, err := node.New(&node.DefaultConfig)
-	// if err != nil {
-	// 	fmt.Errorf("could not create new node: %v", err)
-	// 	return nil
-	// }
-	// XDCXServ, err := XDCx.New(stack, &DefaultConfig)
+	// XDCXServ, err := XDCx.New(&DefaultConfig) //TODO:remove this
+	stack, err := node.New(&node.DefaultConfig)
+	if err != nil {
+		fmt.Errorf("could not create new node: %v", err)
+		return nil
+	}
+	XDCXServ, err := XDCx.New(stack, &DefaultConfig)
+	defer stack.Close()
 	if err != nil {
 		log.Error("could not create new XDCx service: %v", err)
 		return nil

@@ -43,10 +43,12 @@ type SimAdapter struct {
 // NewSimAdapter creates a SimAdapter which is capable of running in-memory
 // simulation nodes running any of the given services (the services to run on a
 // particular node are passed to the NewNode function in the NodeConfig)
-func NewSimAdapter(lifecycles LifecycleConstructors) *SimAdapter {
+func NewSimAdapter(services LifecycleConstructors) *SimAdapter {
 	return &SimAdapter{
+		// nodes:      make(map[discover.NodeID]*SimNode),
+		// lifecycles: lifecycles,
 		nodes:      make(map[discover.NodeID]*SimNode),
-		lifecycles: lifecycles,
+		lifecycles: services,
 	}
 }
 
@@ -129,11 +131,7 @@ func (sa *SimAdapter) DialRPC(id discover.NodeID) (*rpc.Client, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown node: %s", id)
 	}
-	handler, err := node.node.RPCHandler()
-	if err != nil {
-		return nil, err
-	}
-	return rpc.DialInProc(handler), nil
+	return node.node.Attach()
 }
 
 // GetNode returns the node with the given ID if it exists

@@ -96,7 +96,7 @@ func Test_getCancelFee(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create new node: %v", err)
 	}
-	XDCx, err := New(&DefaultConfig)
+	XDCx, err := New(stack, &DefaultConfig)
 	if err != nil {
 		t.Fatalf("could not create new XDCx service: %v", err)
 	}

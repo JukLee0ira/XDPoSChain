@@ -67,7 +67,13 @@ func New(XDCx *XDCx.XDCX) *Lending {
 	}
 	lending.StateCache = lendingstate.NewDatabase(XDCx.GetLevelDB())
 	lending.XDCx = XDCx
-	return lending
+
+	// Register the backend on the node
+	// stack.RegisterAPIs(leth.APIs())
+	// stack.RegisterProtocols(leth.Protocols())
+	// stack.RegisterLifecycle(leth)
+
+	return lending, nil
 }
 
 func (l *Lending) GetLevelDB() XDCxDAO.XDCXDAO {

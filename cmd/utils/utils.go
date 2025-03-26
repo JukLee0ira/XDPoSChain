@@ -63,7 +63,7 @@ func RegisterEthStatsService(stack *node.Node, backend ethapi.Backend, url strin
 }
 
 func RegisterXDCXService(stack *node.Node, cfg *XDCx.Config) {
-	XDCX, err := XDCx.New(cfg)
+	XDCX, err := XDCx.New(stack,cfg)
 	// if err := stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 	// 	return XDCX, nil
 	// }); err != nil {//TODO:remove this
