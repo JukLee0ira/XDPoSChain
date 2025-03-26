@@ -240,7 +240,7 @@ func (h *httpServer) enableRPC(apis []rpc.API, config httpConfig) error {
 	}
 	h.httpConfig = config
 	h.httpHandler.Store(&rpcHandler{
-		Handler: NewHTTPHandlerStack(srv, config.CorsAllowedOrigins, config.Vhosts),
+		Handler: NewHTTPHandlerStack(srv, config.CorsAllowedOrigins, config.Vhosts, &h.timeouts),
 		server:  srv,
 	})
 	return nil
