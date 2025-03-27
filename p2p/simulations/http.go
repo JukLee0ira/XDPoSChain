@@ -176,7 +176,6 @@ func (c *Client) GetNodes() ([]*p2p.NodeInfo, error) {
 // CreateNode creates a node in the network using the given configuration
 func (c *Client) CreateNode(config *adapters.NodeConfig) (*p2p.NodeInfo, error) {
 	node := &p2p.NodeInfo{}
-	log.Println("Creating node with config:", config)
 	return node, c.Post("/nodes", config, node)
 }
 

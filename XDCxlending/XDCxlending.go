@@ -67,7 +67,6 @@ func New(stack *node.Node, XDCx *XDCx.XDCX) (*Lending, error) {
 		lendingTradeHistory: lru.NewCache[common.Hash, map[common.Hash]lendingstate.LendingTradeHistoryItem](defaultCacheLimit),
 	}
 	lending.StateCache = lendingstate.NewDatabase(XDCx.GetLevelDB())
-	log.Info("XDCX 实例未初始化1") //TODO:rm this
 	lending.XDCx = XDCx
 
 	// Register the backend on the node

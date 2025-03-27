@@ -133,9 +133,6 @@ func (XDCx *XDCX) IsSDKNode() bool {
 }
 
 func (XDCx *XDCX) GetLevelDB() XDCxDAO.XDCXDAO {
-	if XDCx == nil {
-		log.Error("XDCX 实例未初始化4") //TODO:rm this
-	}
 	return XDCx.db
 }
 

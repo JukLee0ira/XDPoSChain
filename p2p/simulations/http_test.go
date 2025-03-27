@@ -19,6 +19,7 @@ package simulations
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http/httptest"
 	"reflect"
@@ -28,7 +29,6 @@ import (
 	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/event"
-	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/node"
 	"github.com/XinFinOrg/XDPoSChain/p2p"
 	"github.com/XinFinOrg/XDPoSChain/p2p/discover"
@@ -532,6 +532,7 @@ func TestHTTPNodeRPC(t *testing.T) {
 	// start a node in the network
 	client := NewClient(s.URL)
 	node, err := client.CreateNode(nil)
+	log.Println("Created node:", node)
 	if err != nil {
 		t.Fatalf("error creating node: %s", err)
 	}
@@ -597,7 +598,7 @@ func TestHTTPSnapshot(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error creating node: %s", err)
 		}
-		log.Info("here", node.ID) //TODO:remove this
+
 		if err := client.StartNode(node.ID); err != nil {
 			t.Fatalf("error starting node: %s", err)
 		}

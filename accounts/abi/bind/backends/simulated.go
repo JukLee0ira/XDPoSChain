@@ -120,9 +120,7 @@ func NewXDCSimulatedBackend(alloc types.GenesisAlloc, gasLimit uint64, chainConf
 	var DefaultConfig = XDCx.Config{
 		DataDir: "",
 	}
-	// XDCXServ, err := XDCx.New(&DefaultConfig) //TODO:remove this
 	stack, err := node.New(&node.Config{DataDir: ""})
-	// stack, _:= makeConfigNode(ctx)
 	if err != nil {
 		log.Error("could not create new node: %v", err)
 		return nil

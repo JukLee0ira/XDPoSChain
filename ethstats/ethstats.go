@@ -203,10 +203,6 @@ func (s *Service) loop() {
 
 	// Forensics events
 	forensicsEventCh := make(chan types.ForensicsEvent)
-	// var engine consensusEngine
-	// engine = s.backendEngine().(*XDPoS.XDPoS)
-	// TODO: check if engine have been set
-	// if engine != nil {
 	if engine, ok := s.engine.(consensusEngine); ok {
 		forensicsSub := engine.SubscribeForensicsEvent(forensicsEventCh)
 		defer forensicsSub.Unsubscribe()

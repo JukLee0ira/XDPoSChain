@@ -337,10 +337,6 @@ func (b *EthApiBackend) OrderStats() (pending int, queued int) {
 	return b.eth.txPool.Stats()
 }
 
-// func (b *EthApiBackend) TxPool() *core.TxPool {
-// 	return b.eth.TxPool()
-// }//TODO:remove this function
-
 func (b *EthApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.eth.TxPool().SubscribeNewTxsEvent(ch)
 }

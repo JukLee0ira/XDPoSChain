@@ -329,9 +329,6 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, cfg X
 	if !ok {
 		utils.Fatalf("Ethereum service not running")
 	}
-	// if err := stack.Service(&ethereum); err != nil {
-	// 	utils.Fatalf("Ethereum service not running: %v", err)
-	// }//TODO:remove this,refer :https://github.com/ethereum/go-ethereum/pull/21105/files?diff=split&w=0#diff-30437b401e56caf63af6a19560e47ff5c65bfe20970c044d5c497f2158729b3cL388
 	if engine, ok := ethBackend.Engine().(*XDPoS.XDPoS); ok {
 		go func() {
 			started := false
