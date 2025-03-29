@@ -313,7 +313,8 @@ func (sn *SimNode) SubscribeEvents(ch chan *p2p.PeerEvent) event.Subscription {
 // NodeInfo returns information about the node
 func (sn *SimNode) NodeInfo() *p2p.NodeInfo {
 	server := sn.Server()
-	if server == nil {
+	//这里应该进入server=nil的判断
+	if server.Running == false {
 		return &p2p.NodeInfo{
 			ID:    sn.ID.String(),
 			Enode: sn.Node().String(),

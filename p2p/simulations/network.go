@@ -550,7 +550,12 @@ func (n *Node) NodeInfo() *p2p.NodeInfo {
 	if n.Node == nil {
 		return nil
 	}
+
 	info := n.Node.NodeInfo()
+	if info == nil {
+		return nil
+	}
+
 	info.Name = n.Config.Name
 	return info
 }
