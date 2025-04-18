@@ -76,7 +76,7 @@ type XDPoS_v2 struct {
 }
 
 var (
-	BlockProposedByMeGauge = metrics.NewRegisteredMeter("consensus/blockProposed_v2", nil)
+	BlockProposedByMeGauge = metrics.NewRegisteredGauge("consensus/blockProposed_v2", nil)
 	IsActiveValidatorGauge = metrics.NewRegisteredGauge("consensus/isActiveValidator_v2", nil)
 )
 
@@ -749,7 +749,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 		return err
 	}
 	if verified {
-		BlockProposedByMeGauge.Mark(1)
+		BlockProposedByMeGauge.Inc(1)
 		return x.sendVote(chain, blockInfo)
 	}
 
