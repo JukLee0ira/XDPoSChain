@@ -480,6 +480,7 @@ func (e *Ethereum) SetEtherbase(etherbase common.Address) {
 func (e *Ethereum) ValidateMasternode() (bool, error) {
 	eb, err := e.Etherbase()
 	if err != nil {
+		XDPoS.IsValidatorGauge.Update(0)
 		return false, err
 	}
 	if e.chainConfig.XDPoS != nil {
@@ -489,11 +490,13 @@ func (e *Ethereum) ValidateMasternode() (bool, error) {
 		authorized := c.IsAuthorisedAddress(e.blockchain, e.blockchain.CurrentHeader(), eb)
 		if !authorized {
 			//This miner doesn't belong to set of validators
+			XDPoS.IsValidatorGauge.Update(0)
 			return false, nil
 		}
 	} else {
 		return false, errors.New("only verify masternode permission in XDPoS protocol")
 	}
+	XDPoS.IsValidatorGauge.Update(1)
 	return true, nil
 }
 

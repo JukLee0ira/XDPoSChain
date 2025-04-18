@@ -33,6 +33,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/event"
 	"github.com/XinFinOrg/XDPoSChain/log"
+	"github.com/XinFinOrg/XDPoSChain/metrics"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
 )
@@ -42,6 +43,8 @@ const (
 	SkipExtraFieldCheck = false
 	newRoundChanSize    = 1
 )
+
+var IsValidatorGauge = metrics.NewRegisteredGauge("consensus/isvalidator", nil)
 
 func (x *XDPoS) SigHash(header *types.Header) (hash common.Hash) {
 	switch x.config.BlockConsensusVersion(header.Number, header.Extra, ExtraFieldCheck) {

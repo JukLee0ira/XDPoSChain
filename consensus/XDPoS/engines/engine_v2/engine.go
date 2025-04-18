@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/log"
+	"github.com/XinFinOrg/XDPoSChain/metrics"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/XinFinOrg/XDPoSChain/trie"
 )
@@ -72,6 +74,11 @@ type XDPoS_v2 struct {
 
 	votePoolCollectionTime time.Time
 }
+
+var (
+	BlockProposedByMeGauge = metrics.NewRegisteredGauge("consensus/blockProposed_v2", nil)
+	IsActiveValidatorGauge = metrics.NewRegisteredGauge("consensus/isActiveValidator_v2", nil)
+)
 
 func New(chainConfig *params.ChainConfig, db ethdb.Database, minePeriodCh chan int, newRoundCh chan types.Round) *XDPoS_v2 {
 	config := chainConfig.XDPoS
@@ -742,6 +749,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 		return err
 	}
 	if verified {
+		BlockProposedByMeGauge.Inc(1)
 		return x.sendVote(chain, blockInfo)
 	}
 
@@ -923,6 +931,7 @@ func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round typ
 	x.timeoutCount = 0
 	x.timeoutWorker.Reset(blockChainReader, x.currentRound, x.highestQuorumCert.ProposedBlockInfo.Round)
 	x.timeoutPool.Clear()
+	ConsensusTimeoutGauge.Update(0)
 	// don't need to clean vote pool, we have other process to clean and it's not good to clean here, some edge case may break
 	// for example round gets bump during collecting vote, so we have to keep vote.
 
@@ -1072,6 +1081,14 @@ func (x *XDPoS_v2) calcMasternodes(chain consensus.ChainReader, blockNum *big.In
 	masternodes := common.RemoveItemFromArray(candidates, penalties)
 	if len(masternodes) > maxMasternodes {
 		masternodes = masternodes[:maxMasternodes]
+	}
+
+	if slices.Contains(masternodes, x.signer) && !slices.Contains(penalties, x.signer) {
+		IsActiveValidatorGauge.Update(1)
+	}
+
+	if slices.Contains(penalties, x.signer) {
+		IsActiveValidatorGauge.Update(0)
 	}
 
 	return masternodes, penalties, nil

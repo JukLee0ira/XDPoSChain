@@ -58,5 +58,6 @@ func (x *XDPoS_v2) yourturn(chain consensus.ChainReader, round types.Round, pare
 	}
 
 	log.Info("[yourturn] Yes, it's my turn based on parent block", "ParentHash", parent.Hash().Hex(), "ParentBlockNumber", parent.Number.Uint64())
+	IsActiveValidatorGauge.Update(1)
 	return true, nil
 }

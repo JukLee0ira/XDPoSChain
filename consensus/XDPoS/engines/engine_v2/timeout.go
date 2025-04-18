@@ -13,7 +13,10 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/log"
+	"github.com/XinFinOrg/XDPoSChain/metrics"
 )
+
+var ConsensusTimeoutGauge = metrics.NewRegisteredGauge("consensus/timeoutPoolSize_v2", nil)
 
 func (x *XDPoS_v2) timeoutHandler(blockChainReader consensus.ChainReader, timeout *types.Timeout) error {
 	// checkRoundNumber
@@ -296,6 +299,7 @@ func (x *XDPoS_v2) OnCountdownTimeout(time time.Time, chain interface{}) error {
 	}
 
 	x.timeoutCount++
+	ConsensusTimeoutGauge.Update(int64(x.timeoutCount))
 	if x.timeoutCount%x.config.V2.CurrentConfig.TimeoutSyncThreshold == 0 {
 		log.Warn("[OnCountdownTimeout] timeout sync threadhold reached, send syncInfo message")
 		syncInfo := x.getSyncInfo()
