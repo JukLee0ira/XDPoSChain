@@ -50,6 +50,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/miner"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/XinFinOrg/XDPoSChain/rpc"
+	"github.com/holiman/uint256"
 )
 
 // EthAPIBackend implements ethapi.Backend for full nodes
@@ -257,7 +258,7 @@ func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 	if vmConfig == nil {
 		vmConfig = b.eth.blockchain.GetVMConfig()
 	}
-	state.SetBalance(msg.From(), math.MaxBig256)
+	state.SetBalance(msg.From(), uint256.MustFromBig(math.MaxBig256))
 	txContext := core.NewEVMTxContext(msg)
 	context := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
 	return vm.NewEVM(context, txContext, state, XDCxState, b.eth.chainConfig, *vmConfig), vmError, nil
