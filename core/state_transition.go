@@ -231,7 +231,7 @@ func (st *StateTransition) buyGas() error {
 			balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
 			balanceCheck.Add(balanceCheck, st.value)
 		}
-		if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
+		if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(uint256.MustFromBig(want)) < 0 {
 			return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 		}
 	} else if balanceTokenFee.Cmp(mgval) < 0 {
@@ -244,7 +244,7 @@ func (st *StateTransition) buyGas() error {
 
 	st.initialGas = st.msg.Gas()
 	if balanceTokenFee == nil {
-		st.state.SubBalance(st.msg.From(), mgval)
+		st.state.SubBalance(st.msg.From(), uint256.MustFromBig(mgval))
 	}
 	return nil
 }
@@ -361,7 +361,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 	if overflow {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
-	if !value.IsZero() && !st.evm.Context.CanTransfer(st.state, msg.From(), value.ToBig()) {
+	if !value.IsZero() && !st.evm.Context.CanTransfer(st.state, msg.From(), value) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
 
@@ -370,11 +370,11 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 	if contractCreation {
-		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, uint256.MustFromBig(st.value))
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(sender.Address(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = st.evm.Call(sender, st.to().Address(), st.data, st.gas, st.value)
+		ret, st.gas, vmerr = st.evm.Call(sender, st.to().Address(), st.data, st.gas, uint256.MustFromBig(st.value))
 	}
 	if !eip3529 {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
@@ -386,7 +386,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 
 	if st.evm.Context.BlockNumber.Cmp(common.TIPTRC21Fee) > 0 {
 		if (owner != common.Address{}) {
-			st.state.AddBalance(owner, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
+			st.state.AddBalance(owner, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), uint256.MustFromBig(st.gasPrice)))
 		}
 	} else {
 		effectiveTip := st.gasPrice
@@ -396,7 +396,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (*ExecutionResult,
 				effectiveTip = st.gasTipCap
 			}
 		}
-		st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+		st.state.AddBalance(st.evm.Context.Coinbase, new(uint256.Int).Mul(new(uint256.Int).SetUint64(st.gasUsed()), uint256.MustFromBig(effectiveTip)))
 	}
 
 	return &ExecutionResult{
@@ -419,7 +419,7 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 		from := st.from()
 		// Return ETH for remaining gas, exchanged at the original rate.
 		remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
-		st.state.AddBalance(from.Address(), remaining)
+		st.state.AddBalance(from.Address(), uint256.MustFromBig(remaining))
 	}
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.

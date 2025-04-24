@@ -31,6 +31,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/XDCxlending"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
 	"github.com/XinFinOrg/XDPoSChain/node"
+	"github.com/holiman/uint256"
 
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi"
 	"github.com/XinFinOrg/XDPoSChain/accounts/abi/bind"
@@ -296,7 +297,7 @@ func (b *SimulatedBackend) BalanceAt(ctx context.Context, contract common.Addres
 	if err != nil {
 		return nil, err
 	}
-	return stateDB.GetBalance(contract), nil
+	return stateDB.GetBalance(contract).ToBig(), nil
 }
 
 // NonceAt returns the nonce of a certain account in the blockchain.
@@ -731,7 +732,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call ethereum.CallM
 	}
 	// Set infinite balance to the fake caller account.
 	from := stateDB.GetOrNewStateObject(call.From)
-	from.SetBalance(math.MaxBig256)
+	from.SetBalance(uint256.MustFromBig(math.MaxBig256))
 	// Execute the call.
 	msg := callMsg{call}
 	feeCapacity := state.GetTRC21FeeCapacityFromState(stateDB)
