@@ -39,11 +39,11 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	FrontierBlockReward           = uint256.NewInt(5e+18) // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward          = uint256.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
-	ConstantinopleBlockReward     = uint256.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
-	maxUncles                     = 2                     // Maximum number of uncles allowed in a single block
-	allowedFutureBlockTimeSeconds = int64(15)             // Max seconds from current time allowed for blocks, before they're considered future blocks
+	FrontierBlockReward       = uint256.NewInt(5e+18) // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward      = uint256.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+	ConstantinopleBlockReward = uint256.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
+	maxUncles                 = 2                     // Maximum number of uncles allowed in a single block
+	allowedFutureBlockTime    = 15 * time.Second      // Max time from current time allowed for blocks, before they're considered future blocks
 )
 
 // Various error messages to mark blocks invalid. These should be private to
