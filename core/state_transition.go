@@ -231,7 +231,11 @@ func (st *StateTransition) buyGas() error {
 			balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
 			balanceCheck.Add(balanceCheck, st.value)
 		}
-		if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(uint256.MustFromBig(want)) < 0 {
+		balanceCheckU256, overflow := uint256.FromBig(balanceCheck)
+		if overflow {
+			return fmt.Errorf("%w: address %v required balance exceeds 256 bits", ErrInsufficientFunds, st.msg.From().Hex())
+		}
+		if have, want := st.state.GetBalance(st.msg.From()), balanceCheckU256; have.Cmp(want) < 0 {
 			return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 		}
 	} else if balanceTokenFee.Cmp(mgval) < 0 {
