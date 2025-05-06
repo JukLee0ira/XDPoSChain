@@ -931,7 +931,6 @@ func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round typ
 	x.timeoutCount = 0
 	x.timeoutWorker.Reset(blockChainReader, x.currentRound, x.highestQuorumCert.ProposedBlockInfo.Round)
 	x.timeoutPool.Clear()
-	ConsensusTimeoutGauge.Mark(0)
 	// don't need to clean vote pool, we have other process to clean and it's not good to clean here, some edge case may break
 	// for example round gets bump during collecting vote, so we have to keep vote.
 
