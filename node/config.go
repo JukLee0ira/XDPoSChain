@@ -383,7 +383,7 @@ func (c *Config) NodeKey() *ecdsa.PrivateKey {
 	return key
 }
 
-// CheckLegacyFiles inspects the datadir for signs of legacy static-nodes
+// checkLegacyFiles inspects the datadir for signs of legacy static-nodes
 // and trusted-nodes files. If they exist it raises an error.
 func (c *Config) checkLegacyFiles() {
 	c.checkLegacyFile(c.ResolvePath(datadirStaticNodes))
@@ -435,10 +435,10 @@ func (c *Config) KeyDirConfig() (string, error) {
 	return keydir, err
 }
 
-// getKeyStoreDir retrieves the key directory and will create
+// GetKeyStoreDir retrieves the key directory and will create
 // and ephemeral one if necessary.
-func getKeyStoreDir(conf *Config) (string, bool, error) {
-	keydir, err := conf.KeyDirConfig()
+func (c *Config) GetKeyStoreDir() (string, bool, error) {
+	keydir, err := c.KeyDirConfig()
 	if err != nil {
 		return "", false, err
 	}
