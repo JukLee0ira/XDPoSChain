@@ -521,9 +521,9 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	return bc.loadLastState()
 }
 
-// FastSyncCommitHead sets the current head block to the one defined by the hash
+// SnapSyncCommitHead sets the current head block to the one defined by the hash
 // irrelevant what the chain contents were prior.
-func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
+func (bc *BlockChain) SnapSyncCommitHead(hash common.Hash) error {
 	// Make sure that both the block as well at its state trie exists
 	block := bc.GetBlockByHash(hash)
 	if block == nil {

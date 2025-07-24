@@ -164,7 +164,7 @@ var (
 
 	SyncModeFlag = &cli.StringFlag{
 		Name:     "syncmode",
-		Usage:    `Blockchain sync mode ("fast" or "full")`,
+		Usage:    `Blockchain sync mode ("full")`,
 		Value:    ethconfig.Defaults.SyncMode.String(),
 		Category: flags.EthCategory,
 	}
