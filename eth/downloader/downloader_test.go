@@ -28,6 +28,7 @@ import (
 
 	ethereum "github.com/XinFinOrg/XDPoSChain"
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
@@ -36,15 +37,9 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/trie"
 )
 
-// Reduce some of the parameters to make the tester faster.
-func init() {
-	MaxForkAncestry = uint64(10000)
-	blockCacheMaxItems = 1024
-	fsHeaderContCheck = 500 * time.Millisecond
-}
-
 // downloadTester is a test simulator for mocking out local block chain.
 type downloadTester struct {
+	chain      *core.BlockChain
 	downloader *Downloader
 
 	genesis *types.Block   // Genesis blocks used by the tester and peers
@@ -64,6 +59,7 @@ type downloadTester struct {
 // newTester creates a new downloader test mocker.
 func newTester() *downloadTester {
 	tester := &downloadTester{
+		chain:       chain,
 		genesis:     testGenesis,
 		peerDb:      testDB,
 		peers:       make(map[string]*downloadTesterPeer),
@@ -83,6 +79,8 @@ func newTester() *downloadTester {
 // held resources.
 func (dl *downloadTester) terminate() {
 	dl.downloader.Terminate()
+	dl.chain.Stop()
+
 }
 
 // sync starts synchronizing with a remote peer, blocking until it completes.
@@ -90,13 +88,13 @@ func (dl *downloadTester) sync(id string, td *big.Int, mode SyncMode) error {
 	dl.lock.RLock()
 	hash := dl.peers[id].chain.headBlock().Hash()
 	// If no particular TD was requested, load from the peer's blockchain
+	head := dl.peers[id].chain.CurrentBlock()
 	if td == nil {
-		td = dl.peers[id].chain.td(hash)
+		// If no particular TD was requested, load from the peer's blockchain
+		td = dl.peers[id].chain.GetTd(head.Hash(), head.NumberU64())
 	}
-	dl.lock.RUnlock()
-
 	// Synchronise with the chosen peer and ensure proper cleanup afterwards
-	err := dl.downloader.synchronise(id, hash, td, mode)
+	err := dl.downloader.synchronise(id, head.Hash(), td, mode)
 	select {
 	case <-dl.downloader.cancelCh:
 		// Ok, downloader fully cancelled after sync cycle
@@ -105,25 +103,6 @@ func (dl *downloadTester) sync(id string, td *big.Int, mode SyncMode) error {
 		panic("downloader active post sync cycle") // panic will be caught by tester
 	}
 	return err
-}
-
-// HasHeader checks if a header is present in the testers canonical chain.
-func (dl *downloadTester) HasHeader(hash common.Hash, number uint64) bool {
-	return dl.GetHeaderByHash(hash) != nil
-}
-
-// HasBlock checks if a block is present in the testers canonical chain.
-func (dl *downloadTester) HasBlock(hash common.Hash, number uint64) bool {
-	return dl.GetBlockByHash(hash) != nil
-}
-
-// HasFastBlock checks if a block is present in the testers canonical chain.
-func (dl *downloadTester) HasFastBlock(hash common.Hash, number uint64) bool {
-	dl.lock.RLock()
-	defer dl.lock.RUnlock()
-
-	_, ok := dl.ownReceipts[hash]
-	return ok
 }
 
 // GetHeader retrieves a header from the testers canonical chain.
