@@ -524,7 +524,18 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
 			successfulRequestGauge.Inc(1)
 		}
 		rpcServingTimer.UpdateSince(start)
-		updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
+
+		// Pass args to updateServeTimeHistogram if it's eth_call
+		if msg.Method == "eth_call" {
+			log.Debug("eth_call raw params", "params", msg.Params)
+			if len(args) > 0 {
+				updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start), args[0].Interface())
+			} else {
+				updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
+			}
+		} else {
+			updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
+		}
 	}
 
 	return answer

@@ -18,8 +18,11 @@ package rpc
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
+	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/metrics"
 )
 
@@ -35,7 +38,7 @@ var (
 )
 
 // updateServeTimeHistogram tracks the serving time of a remote RPC call.
-func updateServeTimeHistogram(method string, success bool, elapsed time.Duration) {
+func updateServeTimeHistogram(method string, success bool, elapsed time.Duration, params ...interface{}) {
 	note := "success"
 	if !success {
 		note = "failure"
@@ -47,4 +50,41 @@ func updateServeTimeHistogram(method string, success bool, elapsed time.Duration
 		)
 	}
 	metrics.GetOrRegisterHistogramLazy(h, nil, sampler).Update(elapsed.Nanoseconds())
+
+	// Add metrics for eth_call with contract/caller info
+	if method == "eth_call" && len(params) > 0 {
+		log.Debug("eth_call paramsvvvvvvvvvvvv", "params", params)
+		log.Debug("eth_call params[0] type", "type", fmt.Sprintf("%T", params[0]))
+
+		// Use reflection to access the From and To fields
+		v := reflect.ValueOf(params[0])
+		if v.Kind() == reflect.Struct || (v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct) {
+			// If it's a pointer, get the struct it points to
+			if v.Kind() == reflect.Ptr {
+				v = v.Elem()
+			}
+
+			baseMetric := fmt.Sprintf("%s/eth_call", h)
+
+			// Get To field
+			if toField := v.FieldByName("To"); toField.IsValid() && !toField.IsNil() {
+				to := toField.Interface().(*common.Address)
+				log.Debug("eth_call contract addressvvvvvvvvvvvv", "to", to.Hex())
+				// Record contract address calls
+				contractMetric := fmt.Sprintf("%s/contract/%s", baseMetric, to.Hex())
+				metrics.GetOrRegisterMeter(contractMetric, nil).Mark(1)
+			}
+
+			// Get From field
+			// if fromField := v.FieldByName("From"); fromField.IsValid() && !fromField.IsNil() {
+			// 	from := fromField.Interface().(*common.Address)
+			// 	log.Debug("eth_call caller addressvvvvvvvvvvvv", "from", from.Hex())
+			// 	// Record caller address calls
+			// 	callerMetric := fmt.Sprintf("%s/caller/%s", baseMetric, from.Hex())
+			// 	metrics.GetOrRegisterMeter(callerMetric, nil).Mark(1)
+			// }
+		} else {
+			log.Debug("eth_call paramsvvvvvvvvvvvv,no ok!", "params", params)
+		}
+	}
 }
