@@ -145,7 +145,6 @@ func WriteHeadFastBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
 	}
 }
 
-<<<<<<< HEAD
 // ReadFastTrieProgress retrieves the number of tries nodes fast synced to allow
 // reportinc correct numbers across restarts.
 func ReadFastTrieProgress(db ethdb.KeyValueReader) uint64 {
@@ -176,8 +175,6 @@ func WriteLastPivotNumber(db ethdb.KeyValueWriter, pivot uint64) {
 	}
 }
 
-=======
->>>>>>> 9ea89b0e8 (fix)
 // ReadHeaderRLP retrieves a block header in its raw RLP database encoding.
 func ReadHeaderRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
 	// First try to look up the data in ancient database. Extra hash
