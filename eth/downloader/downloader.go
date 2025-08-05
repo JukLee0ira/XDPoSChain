@@ -27,6 +27,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain"
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/event"
@@ -442,14 +443,9 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 	d.syncStatsChainHeight = height
 	d.syncStatsLock.Unlock()
 
-<<<<<<< HEAD
-	// Ensure our origin point is below any fast sync pivot point
-	if mode == FastSync {
-=======
 	// Ensure our origin point is below any snap sync pivot point
 	pivot := uint64(0)
 	if mode == SnapSync {
->>>>>>> 9ea89b0e8 (fix)
 		if height <= uint64(fsMinFullBlocks) {
 			origin = 0
 		} else {
@@ -460,11 +456,8 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 		}
 	}
 	d.committed = 1
-<<<<<<< HEAD
-	if mode == FastSync && pivot.Number.Uint64() != 0 {
-=======
+
 	if mode == SnapSync && pivot != 0 {
->>>>>>> 9ea89b0e8 (fix)
 		d.committed = 0
 	}
 	// Initiate the sync using a concurrent header and content retrieval algorithm
@@ -474,19 +467,6 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 	}
 
 	fetchers := []func() error{
-<<<<<<< HEAD
-		func() error { return d.fetchHeaders(p, origin+1) }, // Headers are always retrieved
-		func() error { return d.fetchBodies(origin + 1) },   // Bodies are retrieved during normal and fast sync
-		func() error { return d.fetchReceipts(origin + 1) }, // Receipts are retrieved during fast sync
-		func() error { return d.processHeaders(origin+1, td) },
-	}
-	if mode == FastSync {
-		d.pivotLock.Lock()
-		d.pivotHeader = pivot
-		d.pivotLock.Unlock()
-
-		fetchers = append(fetchers, func() error { return d.processFastSyncContent() })
-=======
 		func() error { return d.fetchHeaders(p, origin+1, latest.Number.Uint64(), pivot) }, // Headers are always retrieved
 		func() error { return d.fetchBodies(origin + 1) },                                  // Bodies are retrieved during normal and snap sync
 		func() error { return d.fetchReceipts(origin + 1) },                                // Receipts are retrieved during snap sync
@@ -494,7 +474,6 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 	}
 	if mode == SnapSync {
 		fetchers = append(fetchers, func() error { return d.processSnapSyncContent(latest) })
->>>>>>> 9ea89b0e8 (fix)
 	} else if mode == FullSync {
 		fetchers = append(fetchers, func() error { return d.processFullSyncContent(height) })
 	}
@@ -579,7 +558,7 @@ func (d *Downloader) fetchHead(p *peerConnection, hash common.Hash) (head *types
 	// Request the advertised remote head block and wait for the response
 	latest, _ := p.peer.Head()
 	fetch := 1
-	if mode == FastSync {
+	if mode == SnapSync {
 		fetch = 2 // head + pivot headers
 	}
 	go p.peer.RequestHeadersByHash(latest, fetch, fsMinFullBlocks-1, true)
