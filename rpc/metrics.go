@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/common/hexutil"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/metrics"
 )
@@ -67,22 +68,39 @@ func updateServeTimeHistogram(method string, success bool, elapsed time.Duration
 			baseMetric := fmt.Sprintf("%s/eth_call", h)
 
 			// Get To field
+			// rpc/duration/eth_call/success.xdc0000000000000000000000000000000000000088
 			if toField := v.FieldByName("To"); toField.IsValid() && !toField.IsNil() {
 				to := toField.Interface().(*common.Address)
 				log.Debug("eth_call contract addressvvvvvvvvvvvv", "to", to.Hex())
 				// Record contract address calls
 				contractMetric := fmt.Sprintf("%s/contract/%s", baseMetric, to.Hex())
 				metrics.GetOrRegisterMeter(contractMetric, nil).Mark(1)
+
+				// Get Data field for function signature tracking
+				var funcSig string
+				if dataField := v.FieldByName("Data"); dataField.IsValid() && !dataField.IsNil() {
+					data := dataField.Interface().(*hexutil.Bytes)
+					if data != nil && len(*data) >= 4 {
+						// Extract first 4 bytes (8 hex characters) as function signature
+						funcSig = hexutil.Encode((*data)[:4])
+						log.Debug("eth_call function signature", "func_sig", funcSig)
+					}
+				} else if inputField := v.FieldByName("Input"); inputField.IsValid() && !inputField.IsNil() {
+					input := inputField.Interface().(*hexutil.Bytes)
+					if input != nil && len(*input) >= 4 {
+						// Extract first 4 bytes (8 hex characters) as function signature
+						funcSig = hexutil.Encode((*input)[:4])
+						log.Debug("eth_call function signature", "func_sig", funcSig)
+					}
+				}
+
+				// Create detailed metric with both contract address and function signature
+				if funcSig != "" {
+					detailedMetric := fmt.Sprintf("%s/contract/%s/func/%s", baseMetric, to.Hex(), funcSig)
+					metrics.GetOrRegisterMeter(detailedMetric, nil).Mark(1)
+				}
 			}
 
-			// Get From field
-			// if fromField := v.FieldByName("From"); fromField.IsValid() && !fromField.IsNil() {
-			// 	from := fromField.Interface().(*common.Address)
-			// 	log.Debug("eth_call caller addressvvvvvvvvvvvv", "from", from.Hex())
-			// 	// Record caller address calls
-			// 	callerMetric := fmt.Sprintf("%s/caller/%s", baseMetric, from.Hex())
-			// 	metrics.GetOrRegisterMeter(callerMetric, nil).Mark(1)
-			// }
 		} else {
 			log.Debug("eth_call paramsvvvvvvvvvvvv,no ok!", "params", params)
 		}
